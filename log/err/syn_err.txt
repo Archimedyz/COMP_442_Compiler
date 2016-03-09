@@ -1,0 +1,2 @@
+Syntax Error - (2:14): expected ']', found '-'.
+Syntax Error - (3:16): Unexpected token '+'.
