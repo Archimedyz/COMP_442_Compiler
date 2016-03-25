@@ -219,7 +219,7 @@ public class SyntacticAnalyzer {
 				parseUp();
 				return true;
 			}
-		} else if (("_PROGRAM").contains(lookahead.token_name)) {
+		} else if (("_ID _FLOAT _INT _PROGRAM").contains(lookahead.token_name)) {
 			print("<classDecl> ::= EPSILON");
 			parseUp();
 			return true;
@@ -287,9 +287,9 @@ public class SyntacticAnalyzer {
 		// add the node for this production.
 		parseDown();
 		
-		if(("_PROGRAM").contains(lookahead.token_name)) {
-			if(match("_PROGRAM") && funcBody() && match("_SCOLON") && funcDef()) {
-				print("<progBody> ::= program <funcBody> ; <funcDef>");
+		if(("_ID _FLOAT _INT _PROGRAM").contains(lookahead.token_name)) {
+			if(funcDef() && match("_PROGRAM") && funcBody() && match("_SCOLON")) {
+				print("<progBody> ::= <funcDef> program <funcBody> ;");
 				parseUp();
 				return true;
 			}
@@ -333,7 +333,7 @@ public class SyntacticAnalyzer {
 				parseUp();
 				return true;
 			} 
-		} else if (("_RB _EOF").contains(lookahead.token_name)) {
+		} else if (("_RB _PROGRAM").contains(lookahead.token_name)) {
 			print("<funcDef> ::= EPSILON");
 			parseUp();
 			return true;
@@ -1276,11 +1276,11 @@ public class SyntacticAnalyzer {
 	
 	private void init() {
 		// initialize the FIRST Sets
-		firstSets.put("prog", "_CLASS _PROGRAM");
+		firstSets.put("prog", "_CLASS _ID _FLOAT _INT _PROGRAM");
 		firstSets.put("classDecl", "_EPSILON _CLASS");
 		firstSets.put("varThenFunc", "_EPSILON _ID _FLOAT _INT");
 		firstSets.put("varOrFunc", "_LSB _SCOLON _LP");
-		firstSets.put("progBody", "_PROGRAM");
+		firstSets.put("progBody", "_ID _FLOAT _INT _PROGRAM");
 		firstSets.put("funcHead", "_ID _FLOAT _INT");
 		firstSets.put("funcDef", "_EPSILON _ID _FLOAT _INT");
 		firstSets.put("funcBody", "_LB");
@@ -1322,12 +1322,12 @@ public class SyntacticAnalyzer {
 		
 		// initialize the FOLLOW Sets (does not include EPSILON)
 		followSets.put("prog", "_EOF");
-		followSets.put("classDecl", "_PROGRAM");
+		followSets.put("classDecl", "_ID _FLOAT _INT _PROGRAM");
 		followSets.put("varThenFunc", "_RB");
 		followSets.put("varOrFunc", "_RB");
-		followSets.put("progBody", "EOF");
+		followSets.put("progBody", "_EOF");
 		followSets.put("funcHead", "_LB");
-		followSets.put("funcDef", "_RB _EOF");
+		followSets.put("funcDef", "_RB _PROGRAM");
 		followSets.put("funcBody", "_SCOLON");
 		followSets.put("varThenStat", "_RB");
 		followSets.put("varOrStat", "_RB");
