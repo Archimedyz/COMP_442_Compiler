@@ -64,9 +64,6 @@ public class SymbolTable {
 		return table_rep + sub_table_rep;		
 	}
 	
-	// returns true for a successful creation, otherwise false
-	
-	
 	public class Entry {
 		
 		String name;
@@ -85,7 +82,5 @@ public class SymbolTable {
 		}
 		
 	}
-	
-	
 	
 }

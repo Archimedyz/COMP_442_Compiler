@@ -311,7 +311,7 @@ public class SyntacticAnalyzer {
 		// add the node for this production.
 		parseDown();
 		
-		if(("_CLASS").contains(lookahead.token_name)) {			
+		if(("_CLASS").contains(lookahead.token_name)) {
 			if(match("_CLASS") && match("_ID", class_id) && addEntry(class_id.val, "class", null) && match("_LB") && varThenFunc() && match("_RB") && match("_SCOLON") && popScope() && classDecl()) {
 				print("<classDecl> ::= class id { <varThenFunc> } ; <classDecl>");
 				parseUp();
@@ -369,7 +369,7 @@ public class SyntacticAnalyzer {
 				return true;
 			} 
 		} else if(("_LP").contains(lookahead.token_name)){
-			if (addEntry(name.val, "function", type.val) && match("_LP") && fParams() && match("_RP") && funcBody() && match("_SCOLON") && funcDef()) {
+			if (addEntry(name.val, "function", type.val) && match("_LP") && fParams() && match("_RP") && funcBody() && match("_SCOLON") && popScope() && funcDef()) {
 				print("<varOrFunc> ::= ( <fparams> ) <funcBody> ; <funcDef>");
 				parseUp();
 				return true;
@@ -432,9 +432,8 @@ public class SyntacticAnalyzer {
 		parseDown();
 		
 		if(("_ID _FLOAT _INT").contains(lookahead.token_name)) {
-			if(funcHead(type, name) && addEntry(name.val, "function", type.val) && funcBody() && match("_SCOLON") && funcDef()) {
+			if(funcHead(type, name) && addEntry(name.val, "function", type.val) && funcBody() && match("_SCOLON") && popScope() && funcDef()) {
 				print("<funcDef> ::= <funcHead> <funcBody> ; <funcDef>");
-				popScope();
 				parseUp();
 				return true;
 			} 
@@ -515,7 +514,7 @@ public class SyntacticAnalyzer {
 		parseDown();
 		
 		if(("_ID").contains(lookahead.token_name)) {
-			if(varTail(type) && varThenStat()) {
+			if(classCheck(type) && varTail(type) && varThenStat()) {
 				print("<varOrStat> ::= <varTail> <varThenStat>");
 				parseUp();
 				return true;
@@ -1104,7 +1103,7 @@ public class SyntacticAnalyzer {
 				return true;
 			} 
 		} else if(("_ID").contains(lookahead.token_name)) {
-			if (match("_ID", type)) {
+			if (match("_ID", type) && classCheck(type)) {
 				print("<type> ::= id");
 				parseUp();
 				return true;
@@ -1529,6 +1528,8 @@ public class SyntacticAnalyzer {
 	
 	class StringRef {
 		String val = null;
+		int line = 0;
+		int col = 0;
 	}
 	
 }
