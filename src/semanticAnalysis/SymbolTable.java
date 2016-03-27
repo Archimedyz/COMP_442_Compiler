@@ -14,8 +14,8 @@ public class SymbolTable {
 		this.parent_scope = null;
 	}
 	
-	public Entry createEntry(String name, String kind, String type) {
-		Entry toAdd = new Entry(name, kind, type);
+	public Entry createEntry(String name, String kind, String type, int dimensions, ArrayList<Integer> array_sizes) {
+		Entry toAdd = new Entry(name, kind, type, dimensions, array_sizes);
 		
 		if(("class function").contains(kind)) {
 			toAdd.scope = new SymbolTable(name);
@@ -45,8 +45,29 @@ public class SymbolTable {
 		return false;
 	}
 	
+	public void getType(String name, TypeRef type) {
+		for(Entry e : entries) {
+			if(e.name.equals(name)) {
+				type.copy(e);
+			}
+		}
+	}
+	
 	public SymbolTable getParentScope() {
 		return parent_scope;
+	}
+	
+	public String getScopeName() {
+		return scope_name;
+	}
+	
+	public SymbolTable getScopeOf(String name) {
+		for(Entry e : entries) {
+			if(e.name.equals(name)) {
+				return e.scope;
+			}
+		}
+		return null;
 	}
 	
 	@Override
@@ -69,12 +90,16 @@ public class SymbolTable {
 		String name;
 		String kind;
 		String type;
+		int dimension;
+		ArrayList<Integer> array_sizes;
 		SymbolTable scope;
 		
-		Entry(String name, String kind, String type) {
+		Entry(String name, String kind, String type, int dimension, ArrayList<Integer> array_sizes) {
 			this.name = name;
 			this.kind = kind;
 			this.type = type;
+			this.dimension = dimension;
+			this.array_sizes = array_sizes == null ? new ArrayList<>() : array_sizes;
 		}
 		
 		public SymbolTable getScope() {

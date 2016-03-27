@@ -10,6 +10,7 @@ import core.ParseTree;
 import lexicalAnalysis.LexToken;
 import lexicalAnalysis.LexicalAnalyzer;
 import semanticAnalysis.SymbolTable;
+import semanticAnalysis.TypeRef;
 
 public class SyntacticAnalyzer {
 
@@ -20,6 +21,9 @@ public class SyntacticAnalyzer {
 	private PrintWriter syn_out;
 	private PrintWriter syn_err;
 	
+	private PrintWriter sem_out;
+	private PrintWriter sem_err;
+	
 	private boolean fileOpen;
 	
 	private ParseTree parseTree;
@@ -28,6 +32,7 @@ public class SyntacticAnalyzer {
 	private Map<String, String> followSets;
 	
 	private SymbolTable curr_scope;
+	private TypeRef int_type;
 	
 	// for error messages
 	private Map<String, String> tokenNameToExpectedString;
@@ -43,6 +48,12 @@ public class SyntacticAnalyzer {
 		} catch (FileNotFoundException e) {
 			System.err.println("Cannot open log files. [syn]");
 		}
+		try {
+			sem_out = new PrintWriter("log/out/sem_out.txt");
+			sem_err = new PrintWriter("log/err/sem_err.txt");
+		} catch (FileNotFoundException e) {
+			System.err.println("Cannot open log files. [sem]");
+		}
 		fileOpen = false;
 		lookahead = null;
 		
@@ -52,6 +63,8 @@ public class SyntacticAnalyzer {
 		followSets = new HashMap<>();
 		
 		curr_scope = null;
+		int_type = new TypeRef();
+		int_type.val = "int";
 		
 		tokenNameToExpectedString = new HashMap<>();
 		skipErrorTrueMsgs = new HashMap<>();
@@ -71,7 +84,7 @@ public class SyntacticAnalyzer {
 		lookahead = nextToken();
 		if(prog() && match("_EOF")) {
 			syn_out.write(parseTree.toString());
-			System.out.println(curr_scope.toString());
+			sem_out.write(curr_scope.toString());
 			return true; // compile successful
 		}
 		return false;
@@ -87,6 +100,15 @@ public class SyntacticAnalyzer {
 		} catch (FileNotFoundException e) {
 			System.err.println("Cannot open log files. [syn]");
 		}
+		
+		sem_out.close();
+		sem_err.close();
+		try {
+			sem_out = new PrintWriter("log/out/sem_out.txt");
+			sem_err = new PrintWriter("log/err/sem_err.txt");
+		} catch (FileNotFoundException e) {
+			System.err.println("Cannot open log files. [sem]");
+		}
 				
 		if(!lexical_analyzer.openSource(src_file_path)) {
 			fileOpen = false;
@@ -100,14 +122,18 @@ public class SyntacticAnalyzer {
 		lexical_analyzer.finalize();
 		syn_out.close();
 		syn_err.close();
+		sem_out.close();
+		sem_err.close();
 	}
 	
-	private boolean match(String token_name, StringRef ... ret) {
-		if(ret.length > 0) {
-			ret[0].val = lookahead.lexeme;
-		}
-		
+	private boolean match(String token_name, TypeRef ... ret) {
+				
 		if(lookahead.token_name.equals(token_name)) {
+			if(ret.length > 0) {
+				ret[0].val = lookahead.lexeme;
+				ret[0].line = lookahead.line;
+				ret[0].col = lookahead.col;
+			}
 			lookahead = nextToken();
 			return true;
 		}
@@ -117,6 +143,11 @@ public class SyntacticAnalyzer {
 		do {
 			lookahead = nextTokenAll();
 			if(lookahead.token_name == token_name) {
+				if(ret.length > 0) {
+					ret[0].val = lookahead.lexeme;
+					ret[0].line = lookahead.line;
+					ret[0].col = lookahead.col;
+				}
 				lookahead = nextToken();
 				return true;
 			}
@@ -196,15 +227,19 @@ public class SyntacticAnalyzer {
 	
 	// Semantic Functions - BEGIN
 	
-	private boolean addEntry(String name, String kind, String type) {
+	private boolean addEntry(String name, String kind, TypeRef type) {
+		
+		if(type.val.equals("class")) {
+			type.val = null;
+		}
 		
 		// First determine there is no redefinition within the current_scope
 		if(curr_scope.search(name)) {
-			System.out.println("Semantic Error - multiple declaration: " + type + " " + name + " (" + kind + ").");
+			sem_err.println("Semantic Error - (" + type.line + ":" + type.col + "): Multiple declaration: " + (type.val == null ? "" : (type.val + " ")) + name + " (" + kind + ").");
 			name += " +"; // add a space and then symbol to the name so that matches for it cannot be found in the table, but also so that it is ignored entirely without affecting the compilation
 		}
 		// add the scope anyway for now.
-		SymbolTable next_scope = curr_scope.createEntry(name, kind, type).getScope();
+		SymbolTable next_scope = curr_scope.createEntry(name, kind, type.val, type.dimension, type.array_sizes).getScope();
 		if(next_scope != null) { // if the added entry contains a scope, move into it.
 			curr_scope = next_scope;
 		}
@@ -220,7 +255,7 @@ public class SyntacticAnalyzer {
 	/*
 	 * This Function checks whether the variable/array has been declared in the current scope, or super-scopes 
 	 */
-	private boolean variableCheck(StringRef name) {
+	private boolean variableCheck(TypeRef name) {
 		SymbolTable search_scope = curr_scope;
 		while(search_scope != null) {
 			if(search_scope.search(name.val, "variable") || search_scope.search(name.val, "array")) {
@@ -230,7 +265,7 @@ public class SyntacticAnalyzer {
 		}
 		
 		// if the variable was not in the scope, we will be here, and can display an error
-		System.out.println("Semantic Error - Undefined variable: " + name.val);
+		sem_err.println("Semantic Error - (" + name.line + ":" + name.col + "): Undefined variable: " + name.val);
 		
 		return true;
 	}
@@ -239,7 +274,7 @@ public class SyntacticAnalyzer {
 	/*
 	 * This Function checks whether the function has been declared in the current scope, or super-scopes 
 	 */
-	private boolean functionCheck(StringRef name) {
+	private boolean functionCheck(TypeRef name) {
 		SymbolTable search_scope = curr_scope;
 		while(search_scope != null) {
 			if(search_scope.search(name.val, "function")) {
@@ -249,7 +284,7 @@ public class SyntacticAnalyzer {
 		}
 		
 		// if the variable was not in the scope, we will be here, and can display an error
-		System.out.println("Semantic Error - Undefined function: " + name.val);
+		sem_err.println("Semantic Error - (" + name.line + ":" + name.col + "): Undefined function: " + name.val);
 		
 		return true;
 	}
@@ -258,7 +293,7 @@ public class SyntacticAnalyzer {
 	/*
 	 * This Function checks whether the class has been declared in the current scope, or super-scopes 
 	 */
-	private boolean classCheck(StringRef name) {
+	private boolean classCheck(TypeRef name) {
 		SymbolTable search_scope = curr_scope;
 		while(search_scope != null) {
 			if(search_scope.search(name.val, "class")) {
@@ -268,11 +303,116 @@ public class SyntacticAnalyzer {
 		}
 		
 		// if the variable was not in the scope, we will be here, and can display an error
-		System.out.println("Semantic Error - Undefined class: " + name.val);
+		sem_err.println("Semantic Error - (" + name.line + ":" + name.col + "): Undefined class: " + name.val);
 		
 		return true;
 	}
 	
+	/*
+	 * This function check that both types match for an operation.
+	 */
+	private boolean typeMatch(TypeRef t1, TypeRef t2) {
+		
+		if(t1.val.equals("_typeerror_") || t2.val.equals("_typeerror_")) {
+			// a type error was already detected, so we can ignore this and move on.
+			return true;
+		}
+		
+		if(!t1.val.equals(t2.val) || (t1.dimension - t1.indices) != (t2.dimension - t2.indices)) {
+			sem_err.println("Semantic Error - (" + t1.line + ":" + t1.col + "): Type mismatch: cannot convert type " + t2.val + " to type " + t1.val + ".");
+			// change the type of the latter to typeerror
+			t2.val = "_typeerror_";
+		}
+		
+		return true;
+	}
+	
+	private boolean getType(TypeRef name, TypeRef type) {
+		SymbolTable search_scope = curr_scope;
+		while(search_scope != null) {
+			if(search_scope.search(name.val)) {
+				search_scope.getType(name.val, type);
+				type.line = name.line;
+				type.col = name.col;
+				return true;
+			}
+			search_scope = search_scope.getParentScope();
+		}
+		type.val = "_typeerror_";
+		return true;
+	}
+	
+	private boolean indexVar(TypeRef type) {
+		if(type.indices < type.dimension) {
+			++type.indices;	
+		} else {
+			sem_err.println("Semantic Error - (" + type.line + ":" + type.col + "): Dimension out of bounds. Dimension: " + type.val + " = " + type.dimension + ".");
+		}
+		return true;
+	}
+	
+	private boolean checkReturnType(TypeRef type) {
+		// make sure we are in a function scope.
+		SymbolTable parent_scope = curr_scope.getParentScope();
+		if(parent_scope == null) {
+			sem_err.println("Parsing Error. Return in global scope.");
+		}
+		
+		TypeRef return_type = new TypeRef();
+		parent_scope.getType(curr_scope.getScopeName(), return_type);
+		
+		if(!return_type.val.equals(type.val)) {
+			sem_err.println("Semantic Error - (" + type.line + ":" + type.col + "): Function " + curr_scope.getScopeName() + ": return type must be " + return_type.val + ".");
+		}
+		
+		return true;
+	}
+	
+	/*
+	 * This function determines whether the attribute/function can be found in the provided type.
+	 */
+	private boolean getAttributeType(TypeRef type, TypeRef name, TypeRef attr_type) {
+		if(type.dimension - type.indices != 0) {
+			sem_err.println("Semantic Error - (" + name.line + ":" + name.col + "): Array type cannot have attribute.");
+			return true;
+		}
+		
+		// 1: find the entry for the type being called
+		SymbolTable search_scope = curr_scope;
+		while(search_scope != null) {
+			if(search_scope.search(type.val)) {
+				// the correct attribute had been found. now determine if it has the required attribute.
+				search_scope = search_scope.getScopeOf(type.val);
+				if(search_scope == null) {
+					sem_err.println("Semantic Error - (" + name.line + ":" + name.col + "): Identifier " + type.val + " has no attributes.");
+					attr_type.val = "_typeerror_";
+				} else if (!search_scope.search(name.val)) {
+					sem_err.println("Semantic Error - (" + name.line + ":" + name.col + "): Undefined attribute/function " + name.val + ".");
+					attr_type.val = "_typeerror_";
+				} else {
+					search_scope.getType(name.val, attr_type);
+				}
+				break;
+			}
+		}
+		
+		return true;
+	}
+	
+	private boolean addIndice(TypeRef type, TypeRef size) {
+		try {
+			int int_size = Integer.parseInt(size.val); 
+			if(int_size <= 0) {
+				sem_err.println("Semantic Error - (" + type.line + ":" + type.col + "): Array size must be >= 1.");
+			} else {
+				++type.dimension;
+				type.array_sizes.add(int_size);
+			}
+		} catch(NumberFormatException e) {
+			sem_err.println("Parsing Error: (" + type.line + ":" + type.col + "): Could not convert String to int: " + size.val + ".");
+		}
+		return true;
+	}
 	// Semantic Functions - END
 	
 	
@@ -306,13 +446,13 @@ public class SyntacticAnalyzer {
 			return false;
 		}
 		
-		StringRef class_id = new StringRef();
+		TypeRef class_id = new TypeRef();
 		
 		// add the node for this production.
 		parseDown();
 		
 		if(("_CLASS").contains(lookahead.token_name)) {
-			if(match("_CLASS") && match("_ID", class_id) && addEntry(class_id.val, "class", null) && match("_LB") && varThenFunc() && match("_RB") && match("_SCOLON") && popScope() && classDecl()) {
+			if(match("_CLASS") && match("_ID", class_id) && addEntry(class_id.val, "class", class_id) && match("_LB") && varThenFunc() && match("_RB") && match("_SCOLON") && popScope() && classDecl()) {
 				print("<classDecl> ::= class id { <varThenFunc> } ; <classDecl>");
 				parseUp();
 				return true;
@@ -332,8 +472,8 @@ public class SyntacticAnalyzer {
 			return false;
 		}
 		
-		StringRef type = new StringRef();
-		StringRef name = new StringRef();
+		TypeRef type = new TypeRef();
+		TypeRef name = new TypeRef();
 		
 		// add the node for this production.
 		parseDown();
@@ -353,23 +493,23 @@ public class SyntacticAnalyzer {
 		return false;
 	}
 
-	private boolean varOrFunc(StringRef type, StringRef name) {
+	private boolean varOrFunc(TypeRef type, TypeRef name) {
 		// skip errors
 		if(!skipErrors("varOrFunc")) {
 			return false;
 		}
-		
+				
 		// add the node for this production.
 		parseDown();
 		
 		if(("_LSB _SCOLON").contains(lookahead.token_name)) {
-			if(arraySize() && addEntry(name.val, "variable", type.val) && match("_SCOLON") && varThenFunc()) {
+			if(arraySize(type) && addEntry(name.val, "variable", type) && match("_SCOLON") && varThenFunc()) {
 				print("<varOrFunc> ::= <arraySize> ; <varThenFunc>");
 				parseUp();
 				return true;
 			} 
 		} else if(("_LP").contains(lookahead.token_name)){
-			if (addEntry(name.val, "function", type.val) && match("_LP") && fParams() && match("_RP") && funcBody() && match("_SCOLON") && popScope() && funcDef()) {
+			if (addEntry(name.val, "function", type) && match("_LP") && fParams() && match("_RP") && funcBody() && match("_SCOLON") && popScope() && funcDef()) {
 				print("<varOrFunc> ::= ( <fparams> ) <funcBody> ; <funcDef>");
 				parseUp();
 				return true;
@@ -399,7 +539,7 @@ public class SyntacticAnalyzer {
 		return false;
 	}
 	
-	private boolean funcHead(StringRef type, StringRef name) {
+	private boolean funcHead(TypeRef type, TypeRef name) {
 		// skip errors
 		if(!skipErrors("funcHead")) {
 			return false;
@@ -425,14 +565,14 @@ public class SyntacticAnalyzer {
 			return false;
 		}
 		
-		StringRef type = new StringRef();
-		StringRef name = new StringRef();
+		TypeRef type = new TypeRef();
+		TypeRef name = new TypeRef();
 		
 		// add the node for this production.
 		parseDown();
 		
 		if(("_ID _FLOAT _INT").contains(lookahead.token_name)) {
-			if(funcHead(type, name) && addEntry(name.val, "function", type.val) && funcBody() && match("_SCOLON") && popScope() && funcDef()) {
+			if(funcHead(type, name) && addEntry(name.val, "function", type) && funcBody() && match("_SCOLON") && popScope() && funcDef()) {
 				print("<funcDef> ::= <funcHead> <funcBody> ; <funcDef>");
 				parseUp();
 				return true;
@@ -472,7 +612,7 @@ public class SyntacticAnalyzer {
 			return false;
 		}
 		
-		StringRef type = new StringRef();
+		TypeRef type = new TypeRef();
 		
 		// add the node for this production.
 		parseDown();
@@ -504,11 +644,14 @@ public class SyntacticAnalyzer {
 		return false;
 	}
 
-	private boolean varOrStat(StringRef type) {
+	private boolean varOrStat(TypeRef type) {
 		// skip errors
 		if(!skipErrors("varOrStat")) {
 			return false;
 		}
+		
+		TypeRef right_type = new TypeRef();
+		TypeRef name = new TypeRef();
 		
 		// add the node for this production.
 		parseDown();
@@ -520,7 +663,9 @@ public class SyntacticAnalyzer {
 				return true;
 			}
 		} else if(("_LSB _DOT _EQUAL").contains(lookahead.token_name)) {
-			if (variableCheck(type) && indice() && idnest() && assignOp() && expr() && match("_SCOLON") && mStatement()) {
+			name = type;
+			type = new TypeRef();
+			if (variableCheck(name) && getType(name, type) && indice(type) && idnest(type) && assignOp() && expr(right_type) && match("_SCOLON") && typeMatch(type, right_type) && mStatement()) {
 				print("<varOrStat> ::= <indice> <idnest> <assignOp> <expr> ; <mStatement>");
 				parseUp();
 				return true;
@@ -530,19 +675,19 @@ public class SyntacticAnalyzer {
 		return false;
 	}
 	
-	private boolean varTail(StringRef type) {
+	private boolean varTail(TypeRef type) {
 		// skip errors
 		if(!skipErrors("varTail")) {
 			return false;
 		}
 		
-		StringRef name =  new StringRef();
+		TypeRef name =  new TypeRef();
 		
 		// add the node for this production.
 		parseDown();		
 		
 		if(("_ID").contains(lookahead.token_name)) {
-			if(match("_ID", name) && arraySize() && addEntry(name.val, "variable", type.val) && match("_SCOLON")) {
+			if(match("_ID", name) && arraySize(type) && addEntry(name.val, "variable", type) && match("_SCOLON")) {
 				print("<varTail> ::= id <arraySize> ;");
 				parseUp();
 				return true;
@@ -585,38 +730,39 @@ public class SyntacticAnalyzer {
 			return false;
 		}
 		
-		StringRef type = new StringRef();
-		StringRef name = new StringRef();
+		TypeRef type = new TypeRef();
+		TypeRef right_type = new TypeRef();
+		TypeRef name = new TypeRef();
 		
 		// add the node for this production.
 		parseDown();
 				
 		if(("_RETURN").contains(lookahead.token_name)) {
-			if(match("_RETURN") && match("_LP") && expr() && match("_RP") && match("_SCOLON")) {
+			if(match("_RETURN") && match("_LP") && expr(type) && match("_RP") && match("_SCOLON") && checkReturnType(type)) {
 				print("<statementRes> ::= return ( <expr> ) ;");
 				parseUp();
 				return true;
 			} 
 		} else if(("_PUT").contains(lookahead.token_name)) {
-			if (match("_PUT") && match("_LP") && expr() && match("_RP") && match("_SCOLON")) {
+			if (match("_PUT") && match("_LP") && expr(type) && match("_RP") && match("_SCOLON")) {
 				print("<statementRes> ::= put ( <expr> ) ;");
 				parseUp();
 				return true;
 			} 
 		} else if(("_GET").contains(lookahead.token_name)) {
-			if (match("_GET") && match("_LP") && variable() && match("_RP") && match("_SCOLON")) {
+			if (match("_GET") && match("_LP") && variable(type) && match("_RP") && match("_SCOLON")) {
 				print("<statementRes> ::= get ( <expr> ) ;");
 				parseUp();
 				return true;
 			} 
 		} else if(("_IF").contains(lookahead.token_name)) {
-			if (match("_IF") && match("_LP") && expr() && match("_RP") && match("_THEN") && statBlock() && match("_ELSE") && statBlock() && match("_SCOLON")) {
+			if (match("_IF") && match("_LP") && expr(type) && typeMatch(type, int_type) && match("_RP") && match("_THEN") && statBlock() && match("_ELSE") && statBlock() && match("_SCOLON")) {
 				print("<statementRes> ::= if ( <expr> ) then <statblock> else <statblock> ;");
 				parseUp();
 				return true;
 			} 
 		} else if(("_FOR").contains(lookahead.token_name)) {
-			if (match("_FOR") && match("_LP") && type(type) && match("_ID", name) && addEntry(name.val, "variable", type.val) && assignOp() && expr() && match("_SCOLON") && relExpr() && match("_SCOLON") && assignStat() && match("_RP") && statBlock() && match("_SCOLON")) {
+			if (match("_FOR") && match("_LP") && type(type) && match("_ID", name) && addEntry(name.val, "variable", type) && assignOp() && expr(right_type) && match("_SCOLON") && typeMatch(type, right_type) && relExpr() && match("_SCOLON") && assignStat() && match("_RP") && statBlock() && match("_SCOLON")) {
 				print("<statementRes> ::= for ( <type> id <assignOp> <expr> ; relExpr ; assignStat ) statBlock ;");
 				parseUp();
 				return true;
@@ -656,11 +802,14 @@ public class SyntacticAnalyzer {
 			return false;
 		}
 		
+		TypeRef type1 = new TypeRef();
+		TypeRef type2 = new TypeRef();
+		
 		// add the node for this production.
 		parseDown();
 		
 		if(("_ID").contains(lookahead.token_name)) {
-			if(variable() && assignOp() && expr()) {
+			if(variable(type1) && assignOp() && expr(type2) && typeMatch(type1, type2)) {
 				print("<assignStat> ::= <variable> <assingOp> <expr>");
 				parseUp();
 				return true;
@@ -700,7 +849,7 @@ public class SyntacticAnalyzer {
 		return false;
 	}
 
-	private boolean expr() {
+	private boolean expr(TypeRef type) {
 		// skip errors
 		if(!skipErrors("expr")) {
 			return false;
@@ -710,7 +859,7 @@ public class SyntacticAnalyzer {
 		parseDown();
 				
 		if(("_LP _NOT _ID _FNUM _INUM _ADDOP").contains(lookahead.token_name)) {
-			if(arithExpr() && relExprPart()) {
+			if(arithExpr(type) && relExprPart(type)) {
 				print("<expr> ::= <arithExpr> <relExprPart>");
 				parseUp();
 				return true;
@@ -720,18 +869,23 @@ public class SyntacticAnalyzer {
 		return false;
 	}
 
-	private boolean relExprPart() {
+	private boolean relExprPart(TypeRef left_type) {
 		// skip errors
 		if(!skipErrors("relExprPart")) {
 			return false;
 		}
 		
+		TypeRef right_type = new TypeRef();
+		
 		// add the node for this production.
 		parseDown();
 		
 		if(("_LT _GT _RELOP").contains(lookahead.token_name)) {
-			if(relOp() && arithExpr()) {
+			if(relOp() && arithExpr(right_type) && typeMatch(left_type, right_type)) {
 				print("<relExprPart> ::= <relOp> <arithExpr>");
+				if(!right_type.val.equals("_typeerror_")) {
+					left_type.val = "int"; // convert the relation to int for boolean.
+				}
 				parseUp();
 				return true;
 			}
@@ -750,11 +904,14 @@ public class SyntacticAnalyzer {
 			return false;
 		}
 		
+		TypeRef left_type = new TypeRef();
+		TypeRef right_type = new TypeRef();
+		
 		// add the node for this production.
 		parseDown();
 		
 		if(("_LP _NOT _ID _FNUM _INUM _ADDOP").contains(lookahead.token_name)) {
-			if(arithExpr() && relOp() && arithExpr()) {
+			if(arithExpr(left_type) && relOp() && arithExpr(right_type) && typeMatch(left_type, right_type)) {
 				print("<relExpr> ::= <arithExpr> <relOp> <arithExpr>");
 				parseUp();
 				return true;
@@ -764,17 +921,17 @@ public class SyntacticAnalyzer {
 		return false;
 	}
 
-	private boolean arithExpr() {
+	private boolean arithExpr(TypeRef type) {
 		// skip errors
 		if(!skipErrors("arithExpr")) {
 			return false;
 		}
-		
+				
 		// add the node for this production.
 		parseDown();
 				
 		if(("_LP _NOT _ID _FNUM _INUM _ADDOP").contains(lookahead.token_name)) {
-			if(term() && arithExprTail()) {
+			if(term(type) && arithExprTail(type)) {
 				print("<arithExpr> ::= <term> <arithExprTail>");
 				parseUp();
 				return true;
@@ -784,18 +941,20 @@ public class SyntacticAnalyzer {
 		return false;
 	}
 
-	private boolean arithExprTail() {
+	private boolean arithExprTail(TypeRef type) {
 		// skip errors
 		if(!skipErrors("arithExprTail")) {
 			return false;
 		}
 		
+		TypeRef right_type = new TypeRef();
+		
 		// add the node for this production.
 		parseDown();
 		
 		if(("_ADDOP _OR").contains(lookahead.token_name)) {
-			if(addOp() && term() && arithExprTail()) {
-				print("<arithExprTail> ::= <addOp> <term> <arithEExprTail>");
+			if(addOp() && term(right_type) && arithExprTail(right_type) && typeMatch(type, right_type)) {
+				print("<arithExprTail> ::= <addOp> <term> <arithExprTail>");
 				parseUp();
 				return true;
 			}
@@ -831,7 +990,7 @@ public class SyntacticAnalyzer {
 		return false;
 	}
 
-	private boolean term() {
+	private boolean term(TypeRef type) {
 		// skip errors
 		if(!skipErrors("term")) {
 			return false;
@@ -841,7 +1000,7 @@ public class SyntacticAnalyzer {
 		parseDown();
 		
 		if(("_LP _NOT _ID _FNUM _INUM _ADDOP").contains(lookahead.token_name)) {
-			if(factor() && termTail()) {
+			if(factor(type) && termTail(type)) {
 				print("<term> ::= <factor> <termTail>");
 				parseUp();
 				return true;
@@ -851,17 +1010,19 @@ public class SyntacticAnalyzer {
 		return false;
 	}
 
-	private boolean termTail() {
+	private boolean termTail(TypeRef type) {
 		// skip errors
 		if(!skipErrors("termTail")) {
 			return false;
 		}
 		
+		TypeRef right_type = new TypeRef();
+		
 		// add the node for this production.
 		parseDown();
 		
 		if(("_MULTOP _AND").contains(lookahead.token_name)) {
-			if(multOp() && factor() && termTail()) {
+			if(multOp() && factor(right_type) && termTail(right_type) && typeMatch(type, right_type)) {
 				print("<termTail> ::= <multOp> <factor> <termTail>");
 				parseUp();
 				return true;
@@ -875,7 +1036,7 @@ public class SyntacticAnalyzer {
 		return false;
 	}
 
-	private boolean factor() {
+	private boolean factor(TypeRef type) {
 		// skip errors
 		if(!skipErrors("factor")) {
 			return false;
@@ -885,31 +1046,31 @@ public class SyntacticAnalyzer {
 		parseDown();
 		
 		if(("_ADDOP").contains(lookahead.token_name)) {
-			if(sign() && factor()) {
+			if(sign() && factor(type)) {
 				print("<factor> ::= <sign> <factor>");
 				parseUp();
 				return true;
 			} 
 		} else if(("_FNUM _INUM").contains(lookahead.token_name)) {
-			if (num()) {
+			if (num(type)) {
 				print("<factor> ::= <num>");
 				parseUp();
 				return true;
 			}
 		} else if(("_ID").contains(lookahead.token_name)) {
-			if (varOrFuncCall()) {
+			if (varOrFuncCall(type)) {
 				print("<factor> ::= <varOrFuncCall>");
 				parseUp();
 				return true;
 			}
 		} else if(("_NOT").contains(lookahead.token_name)) {
-			if (match("_NOT") && factor()) {
+			if (match("_NOT") && factor(type) && typeMatch(type, int_type)) {
 				print("<factor> ::= not <factor>");
 				parseUp();
 				return true;
 			} 
 		} else if(("_LP").contains(lookahead.token_name)) {
-			if (match("_LP") && arithExpr() && match("_RP")) {
+			if (match("_LP") && arithExpr(type) && match("_RP")) {
 				print("<factor> ::= ( <arithExpr> )");
 				parseUp();
 				return true;
@@ -919,17 +1080,19 @@ public class SyntacticAnalyzer {
 		return false;
 	}
 
-	private boolean varOrFuncCall() {
+	private boolean varOrFuncCall(TypeRef type) {
 		// skip errors
 		if(!skipErrors("varOrFuncCall")) {
 			return false;
 		}
 		
+		TypeRef name = new TypeRef();
+		
 		// add the node for this production.
 		parseDown();		
 		
 		if(("_ID").contains(lookahead.token_name)) {
-			if(match("_ID") && varOrFuncCallTail()) {
+			if(match("_ID", name) && getType(name, type) && varOrFuncCallTail(name, type)) {
 				print("<varOrFuncCall> ::= id <varOrFuncCallTail>");
 				parseUp();
 				return true;
@@ -939,7 +1102,7 @@ public class SyntacticAnalyzer {
 		return false;
 	}
 	
-	private boolean varOrFuncCallTail() {
+	private boolean varOrFuncCallTail(TypeRef name, TypeRef type) {
 		// skip errors
 		if(!skipErrors("varOrFuncCallTail")) {
 			return false;
@@ -949,8 +1112,8 @@ public class SyntacticAnalyzer {
 		parseDown();
 				
 		if(("_LSB _DOT").contains(lookahead.token_name)) {
-			if(indice() && varOrFuncCallTailTail()) {
-				print("<varOrFuncCallTail> ::= indice <varOrFuncCallTailTail>");
+			if(indice(type) && varOrFuncCallTailTail(type)) {
+				print("<varOrFuncCallTail> ::= <indice> <varOrFuncCallTailTail>");
 				parseUp();
 				return true;
 			} 
@@ -969,7 +1132,7 @@ public class SyntacticAnalyzer {
 		return false;
 	}
 	
-	private boolean varOrFuncCallTailTail() {
+	private boolean varOrFuncCallTailTail(TypeRef type) {
 		// skip errors
 		if(!skipErrors("varOrFuncCallTailTail")) {
 			return false;
@@ -979,7 +1142,7 @@ public class SyntacticAnalyzer {
 		parseDown();
 		
 		if(("_DOT").contains(lookahead.token_name)) {
-			if(match("_DOT") && varOrFuncCall()) {
+			if(match("_DOT") && varOrFuncCall(type)) {
 				print("<varOrFuncCallTailTail> ::= . <varOrFuncCall>");
 				parseUp();
 				return true;
@@ -993,17 +1156,19 @@ public class SyntacticAnalyzer {
 		return false;
 	}
 
-	private boolean variable() {
+	private boolean variable(TypeRef type) {
 		// skip errors
 		if(!skipErrors("variable")) {
 			return false;
 		}
 		
+		TypeRef name = new TypeRef();
+		
 		// add the node for this production.
 		parseDown();
 				
 		if(("_ID").contains(lookahead.token_name)) {
-			if(match("_ID") && indice() && idnest()) {
+			if(match("_ID", name) && variableCheck(name) && getType(name, type) && indice(type) && idnest(type)) {
 				print("<variable> ::= id <indice> <idnest>");
 				parseUp();
 				return true;
@@ -1013,17 +1178,20 @@ public class SyntacticAnalyzer {
 		return false;
 	}
 
-	private boolean idnest() {
+	private boolean idnest(TypeRef type) {
 		// skip errors
 		if(!skipErrors("idnest")) {
 			return false;
 		}
 		
+		TypeRef name = new TypeRef();
+		TypeRef attr_type = new TypeRef();
+		
 		// add the node for this production.
 		parseDown();
 		
 		if(("_DOT").contains(lookahead.token_name)) {
-			if(match("_DOT") && match("_ID") && indice() && idnest()) {
+			if(match("_DOT") && match("_ID", name) && getAttributeType(type, name, attr_type) && indice(type) && idnest(type)) {
 				print("<idnest> ::= . id <indice> <idnest>");
 				parseUp();
 				return true;
@@ -1037,17 +1205,19 @@ public class SyntacticAnalyzer {
 		return false;
 	}
 
-	private boolean indice() {
+	private boolean indice(TypeRef type) {
 		// skip errors
 		if(!skipErrors("indice")) {
 			return false;
 		}
 		
+		TypeRef index_type = new TypeRef();
+		
 		// add the node for this production.
 		parseDown();
 		
 		if(("_LSB").contains(lookahead.token_name)) {
-			if(match("_LSB") && arithExpr() && match("_RSB") && indice()) {
+			if(indexVar(type) && match("_LSB") && arithExpr(index_type) && typeMatch(index_type, int_type) && match("_RSB") && indice(type)) {
 				print("<indice> ::= [ <arithExpr> ] <indice>");
 				parseUp();
 				return true;
@@ -1061,17 +1231,19 @@ public class SyntacticAnalyzer {
 		return false;
 	}
 
-	private boolean arraySize() {
+	private boolean arraySize(TypeRef type) {
 		// skip errors
 		if(!skipErrors("arraySize")) {
 			return false;
 		}
 		
+		TypeRef size = new TypeRef();
+		
 		// add the node for this production.
 		parseDown();
 		
 		if(("_LSB").contains(lookahead.token_name)) {
-			if(match("_LSB") && match("_INUM") && match("_RSB") && arraySize()) {
+			if(match("_LSB") && match("_INUM", size) && match("_RSB") && addIndice(type, size) && arraySize(type)) {
 				print("<arraySize> ::= [ inum ] <arraySize>");
 				parseUp();
 				return true;
@@ -1085,7 +1257,7 @@ public class SyntacticAnalyzer {
 		return false;
 	}
 	
-	private boolean type(StringRef type) {
+	private boolean type(TypeRef type) {
 		// skip errors
 		if(!skipErrors("type")) {
 			return false;
@@ -1113,7 +1285,7 @@ public class SyntacticAnalyzer {
 		return false;
 	}
 
-	private boolean primitiveType(StringRef type) {
+	private boolean primitiveType(TypeRef type) {
 		// skip errors
 		if(!skipErrors("primitiveType")) {
 			return false;
@@ -1145,14 +1317,14 @@ public class SyntacticAnalyzer {
 			return false;
 		}
 		
-		StringRef type = new StringRef();
-		StringRef name = new StringRef();
+		TypeRef type = new TypeRef();
+		TypeRef name = new TypeRef();
 		
 		// add the node for this production.
 		parseDown();
 		
 		if(("_ID _FLOAT _INT").contains(lookahead.token_name)) {
-			if(type(type) && match("_ID", name) && arraySize() && addEntry(name.val, "parameter", type.val) && fParamsTail()) {
+			if(type(type) && match("_ID", name) && arraySize(type) && addEntry(name.val, "parameter", type) && fParamsTail()) {
 				print("<fParams> ::= <type> id <arraySize> <fParamsTail>");
 				parseUp();
 				return true;
@@ -1172,11 +1344,13 @@ public class SyntacticAnalyzer {
 			return false;
 		}
 		
+		TypeRef type = new TypeRef();
+		
 		// add the node for this production.
 		parseDown();
 				
 		if(("_LP _NOT _ID _FNUM _INUM _ADDOP").contains(lookahead.token_name)) {
-			if(expr() && aParamsTail()) {
+			if(expr(type) && aParamsTail()) {
 				print("<aParams> ::= <expr> <aParamsTail>");
 				parseUp();
 				return true;
@@ -1196,14 +1370,14 @@ public class SyntacticAnalyzer {
 			return false;
 		}
 		
-		StringRef type = new StringRef();
-		StringRef name = new StringRef();
+		TypeRef type = new TypeRef();
+		TypeRef name = new TypeRef();
 		
 		// add the node for this production.
 		parseDown();
 		
 		if(("_COMMA").contains(lookahead.token_name)) {
-			if(match("_COMMA") && type(type) && match("_ID", name) && arraySize() && addEntry(name.val, "parameter", type.val) && fParamsTail()) {
+			if(match("_COMMA") && type(type) && match("_ID", name) && arraySize(type) && addEntry(name.val, "parameter", type) && fParamsTail()) {
 				print("<fParamsTail> ::= , <type> id <arraySize> <fParamsTail>");
 				parseUp();
 				return true;
@@ -1223,11 +1397,13 @@ public class SyntacticAnalyzer {
 			return false;
 		}
 		
+		TypeRef type = new TypeRef();
+		
 		// add the node for this production.
 		parseDown();
 		
 		if(("_COMMA").contains(lookahead.token_name)) {
-			if(match("_COMMA") && expr() && aParamsTail()) {
+			if(match("_COMMA") && expr(type) && aParamsTail()) {
 				print("<aParamsTail> ::= , <expr> <aParamsTail>");
 				parseUp();
 				return true;
@@ -1348,7 +1524,7 @@ public class SyntacticAnalyzer {
 		return false;
 	}	
 	
-	private boolean num() {
+	private boolean num(TypeRef type) {
 		// skip errors
 		if(!skipErrors("num")) {
 			return false;
@@ -1358,13 +1534,15 @@ public class SyntacticAnalyzer {
 		parseDown();
 				
 		if(("_INUM").contains(lookahead.token_name)) {
-			if(match("_INUM")) {
+			if(match("_INUM", type)) {
+				type.val = "int";
 				print("<num> ::= inum");
 				parseUp();
 				return true;
 			} 
 		} else if(("_FNUM").contains(lookahead.token_name)) {
-			if (match("_FNUM")) {
+			if (match("_FNUM", type)) {
+				type.val = "float";
 				print("<num> ::= fnum");
 				parseUp();
 				return true;
@@ -1522,14 +1700,5 @@ public class SyntacticAnalyzer {
 		
 		// initialize messages for each token when skipping errors.
 	
-	}
-	
-
-	
-	class StringRef {
-		String val = null;
-		int line = 0;
-		int col = 0;
-	}
-	
+	}	
 }

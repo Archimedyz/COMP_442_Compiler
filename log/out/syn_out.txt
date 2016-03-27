@@ -46,7 +46,7 @@
 <term> ::= <factor> <termTail>
 <factor> ::= <varOrFuncCall>
 <varOrFuncCall> ::= id <varOrFuncCallTail>
-<varOrFuncCallTail> ::= indice <varOrFuncCallTailTail>
+<varOrFuncCallTail> ::= <indice> <varOrFuncCallTailTail>
 <indice> ::= [ <arithExpr> ] <indice>
 <arithExpr> ::= <term> <arithExprTail>
 <term> ::= <factor> <termTail>
@@ -100,7 +100,7 @@
 <varOrFuncCall> ::= id <varOrFuncCallTail>
 <varOrFuncCallTail> ::= EPSILON
 <termTail> ::= EPSILON
-<arithExprTail> ::= <addOp> <term> <arithEExprTail>
+<arithExprTail> ::= <addOp> <term> <arithExprTail>
 <addOp> ::= -
 <term> ::= <factor> <termTail>
 <factor> ::= <num>
@@ -117,7 +117,7 @@
 <term> ::= <factor> <termTail>
 <factor> ::= <varOrFuncCall>
 <varOrFuncCall> ::= id <varOrFuncCallTail>
-<varOrFuncCallTail> ::= indice <varOrFuncCallTailTail>
+<varOrFuncCallTail> ::= <indice> <varOrFuncCallTailTail>
 <indice> ::= [ <arithExpr> ] <indice>
 <arithExpr> ::= <term> <arithExprTail>
 <term> ::= <factor> <termTail>
@@ -152,7 +152,7 @@
 <term> ::= <factor> <termTail>
 <factor> ::= <varOrFuncCall>
 <varOrFuncCall> ::= id <varOrFuncCallTail>
-<varOrFuncCallTail> ::= indice <varOrFuncCallTailTail>
+<varOrFuncCallTail> ::= <indice> <varOrFuncCallTailTail>
 <indice> ::= [ <arithExpr> ] <indice>
 <arithExpr> ::= <term> <arithExprTail>
 <term> ::= <factor> <termTail>
@@ -212,7 +212,7 @@
 <term> ::= <factor> <termTail>
 <factor> ::= <varOrFuncCall>
 <varOrFuncCall> ::= id <varOrFuncCallTail>
-<varOrFuncCallTail> ::= indice <varOrFuncCallTailTail>
+<varOrFuncCallTail> ::= <indice> <varOrFuncCallTailTail>
 <indice> ::= [ <arithExpr> ] <indice>
 <arithExpr> ::= <term> <arithExprTail>
 <term> ::= <factor> <termTail>
@@ -271,7 +271,7 @@
 <termTail> ::= EPSILON
 <arithExprTail> ::= EPSILON
 <termTail> ::= EPSILON
-<arithExprTail> ::= <addOp> <term> <arithEExprTail>
+<arithExprTail> ::= <addOp> <term> <arithExprTail>
 <addOp> ::= +
 <term> ::= <factor> <termTail>
 <factor> ::= <num>
@@ -288,7 +288,7 @@
 <term> ::= <factor> <termTail>
 <factor> ::= <varOrFuncCall>
 <varOrFuncCall> ::= id <varOrFuncCallTail>
-<varOrFuncCallTail> ::= indice <varOrFuncCallTailTail>
+<varOrFuncCallTail> ::= <indice> <varOrFuncCallTailTail>
 <indice> ::= [ <arithExpr> ] <indice>
 <arithExpr> ::= <term> <arithExprTail>
 <term> ::= <factor> <termTail>
@@ -323,7 +323,7 @@
 <term> ::= <factor> <termTail>
 <factor> ::= <varOrFuncCall>
 <varOrFuncCall> ::= id <varOrFuncCallTail>
-<varOrFuncCallTail> ::= indice <varOrFuncCallTailTail>
+<varOrFuncCallTail> ::= <indice> <varOrFuncCallTailTail>
 <indice> ::= [ <arithExpr> ] <indice>
 <arithExpr> ::= <term> <arithExprTail>
 <term> ::= <factor> <termTail>
@@ -427,7 +427,7 @@
 <factor> ::= <num>
 <num> ::= inum
 <termTail> ::= EPSILON
-<arithExprTail> ::= <addOp> <term> <arithEExprTail>
+<arithExprTail> ::= <addOp> <term> <arithExprTail>
 <addOp> ::= +
 <term> ::= <factor> <termTail>
 <factor> ::= <num>
@@ -454,7 +454,7 @@
 <factor> ::= <num>
 <num> ::= fnum
 <termTail> ::= EPSILON
-<arithExprTail> ::= <addOp> <term> <arithEExprTail>
+<arithExprTail> ::= <addOp> <term> <arithExprTail>
 <addOp> ::= +
 <term> ::= <factor> <termTail>
 <factor> ::= ( <arithExpr> )
@@ -472,7 +472,7 @@
 <termTail> ::= EPSILON
 <arithExprTail> ::= EPSILON
 <termTail> ::= EPSILON
-<arithExprTail> ::= <addOp> <term> <arithEExprTail>
+<arithExprTail> ::= <addOp> <term> <arithExprTail>
 <addOp> ::= -
 <term> ::= <factor> <termTail>
 <factor> ::= <num>
@@ -480,7 +480,7 @@
 <termTail> ::= EPSILON
 <arithExprTail> ::= EPSILON
 <termTail> ::= EPSILON
-<arithExprTail> ::= <addOp> <term> <arithEExprTail>
+<arithExprTail> ::= <addOp> <term> <arithExprTail>
 <addOp> ::= +
 <term> ::= <factor> <termTail>
 <factor> ::= <num>
@@ -580,7 +580,7 @@
 <varOrFuncCall> ::= id <varOrFuncCallTail>
 <varOrFuncCallTail> ::= EPSILON
 <termTail> ::= EPSILON
-<arithExprTail> ::= <addOp> <term> <arithEExprTail>
+<arithExprTail> ::= <addOp> <term> <arithExprTail>
 <addOp> ::= +
 <term> ::= <factor> <termTail>
 <factor> ::= <num>
@@ -626,7 +626,7 @@
 <term> ::= <factor> <termTail>
 <factor> ::= <varOrFuncCall>
 <varOrFuncCall> ::= id <varOrFuncCallTail>
-<varOrFuncCallTail> ::= indice <varOrFuncCallTailTail>
+<varOrFuncCallTail> ::= <indice> <varOrFuncCallTailTail>
 <indice> ::= [ <arithExpr> ] <indice>
 <arithExpr> ::= <term> <arithExprTail>
 <term> ::= <factor> <termTail>
@@ -657,7 +657,7 @@
 <term> ::= <factor> <termTail>
 <factor> ::= <varOrFuncCall>
 <varOrFuncCall> ::= id <varOrFuncCallTail>
-<varOrFuncCallTail> ::= indice <varOrFuncCallTailTail>
+<varOrFuncCallTail> ::= <indice> <varOrFuncCallTailTail>
 <indice> ::= [ <arithExpr> ] <indice>
 <arithExpr> ::= <term> <arithExprTail>
 <term> ::= <factor> <termTail>
@@ -700,7 +700,7 @@
 <term> ::= <factor> <termTail>
 <factor> ::= <varOrFuncCall>
 <varOrFuncCall> ::= id <varOrFuncCallTail>
-<varOrFuncCallTail> ::= indice <varOrFuncCallTailTail>
+<varOrFuncCallTail> ::= <indice> <varOrFuncCallTailTail>
 <indice> ::= EPSILON
 <varOrFuncCallTailTail> ::= . <varOrFuncCall>
 <varOrFuncCall> ::= id <varOrFuncCallTail>
@@ -755,7 +755,7 @@
 <termTail> ::= EPSILON
 <arithExprTail> ::= EPSILON
 <termTail> ::= EPSILON
-<arithExprTail> ::= <addOp> <term> <arithEExprTail>
+<arithExprTail> ::= <addOp> <term> <arithExprTail>
 <addOp> ::= or
 <term> ::= <factor> <termTail>
 <factor> ::= <varOrFuncCall>
@@ -811,7 +811,7 @@
 <term> ::= <factor> <termTail>
 <factor> ::= <varOrFuncCall>
 <varOrFuncCall> ::= id <varOrFuncCallTail>
-<varOrFuncCallTail> ::= indice <varOrFuncCallTailTail>
+<varOrFuncCallTail> ::= <indice> <varOrFuncCallTailTail>
 <indice> ::= EPSILON
 <varOrFuncCallTailTail> ::= . <varOrFuncCall>
 <varOrFuncCall> ::= id <varOrFuncCallTail>
@@ -842,7 +842,7 @@
 <term> ::= <factor> <termTail>
 <factor> ::= <varOrFuncCall>
 <varOrFuncCall> ::= id <varOrFuncCallTail>
-<varOrFuncCallTail> ::= indice <varOrFuncCallTailTail>
+<varOrFuncCallTail> ::= <indice> <varOrFuncCallTailTail>
 <indice> ::= EPSILON
 <varOrFuncCallTailTail> ::= . <varOrFuncCall>
 <varOrFuncCall> ::= id <varOrFuncCallTail>
