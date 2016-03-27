@@ -38,6 +38,13 @@ class Struct
 	float val;
 };
 
+class Struct
+{
+	int struct_id2;
+	float val3;
+	float val4;
+};
+
 float randomize()
 {
 	float value;

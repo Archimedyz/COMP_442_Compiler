@@ -22,4 +22,26 @@ public class SemanticAnalyzer {
 		sem_err.close();
 	}
 	
+	public boolean create(String table_name) {
+		
+		return true;
+	}
+	
+	public boolean delete(String table_name) {
+		
+		return true;
+	}
+	
+	public boolean insert(String table_name, String identifier, Object ptr) {
+		
+		return true;
+	}
+	
+	public boolean search(String table_name, String identifier, Object ptr) {
+		
+		return true;
+	}
+	
+	
+	
 }
