@@ -36,7 +36,7 @@ public class Compiler {
 	public static void main(String[] args) {
 		Compiler compiler = new Compiler();
 		
-		boolean success = compiler.compileFile("source_file.txt");
+		boolean success = compiler.compileFile("test_files/test_file_3.txt");
 		
 		System.out.println("Compile " + (success ? "Successful" : "Unsuccessful") + ".");
 	}

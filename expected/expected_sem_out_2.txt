@@ -1,0 +1,11 @@
+SCOPE: global [ID: 1]
+(0)[B, class, B, , 2]
+(4)[a, variable, int, [2], NO]
+(5)[b_ref, variable, B, [2], NO]
+
+SCOPE: B [ID: 2]
+(1)[a_ref, variable, A, , NO]
+(2)[typeMismatch, function, float, , 3]
+
+SCOPE: typeMismatch [ID: 3]
+(3)[i, variable, int, [10][10], NO]

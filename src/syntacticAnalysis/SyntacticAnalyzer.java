@@ -314,8 +314,11 @@ public class SyntacticAnalyzer {
 		return str;
 	}
 	
-	private boolean getType(TypeRef name, TypeRef type) {
+	private boolean getType(TypeRef name, TypeRef type, SymbolTable... scopes) {
 		SymbolTable search_scope = curr_scope;
+		if(scopes.length > 0) {
+			search_scope = scopes[0];
+		}
 		while(search_scope != null) {
 			if(search_scope.search(name.val)) {
 				search_scope.getType(name.val, type);
@@ -405,7 +408,7 @@ public class SyntacticAnalyzer {
 	
 	private boolean functionCheck(TypeRef name, SymbolTable var_scope) {
 		
-		if(var_scope != null && var_scope.search(name.val)) {
+		if(var_scope != null && var_scope.search(name.val, "function")) {
 			return true;
 		}
 		
@@ -418,7 +421,7 @@ public class SyntacticAnalyzer {
 		SymbolTable search_scope = var_scope;
 		while(search_scope != null) {
 			if(search_scope.search(type.val)) {
-				var_scope = search_scope.getScopeOf(type.val);
+				var_scope.copy(search_scope.getScopeOf(type.val));
 				return true;
 			}
 			search_scope = search_scope.getParentScope();
@@ -1100,7 +1103,7 @@ public class SyntacticAnalyzer {
 		}
 		
 		// maintain reference to current table, as it may change later.
-		SymbolTable old_scope = scope;
+		SymbolTable new_scope = new SymbolTable(scope);
 		
 		TypeRef name = new TypeRef();
 		
@@ -1108,15 +1111,13 @@ public class SyntacticAnalyzer {
 		parseDown();		
 		
 		if(("_ID").contains(lookahead.token_name)) {
-			if(match("_ID", name) && getType(name, type) && varOrFuncCallTail(name, type, scope)) {
+			if(match("_ID", name) && getType(name, type, new_scope) && varOrFuncCallTail(name, type, new_scope)) {
 				print("<varOrFuncCall> ::= id <varOrFuncCallTail>");
 				parseUp();
-				scope = old_scope;
 				return true;
 			}
 		}	
 		parseDestroy();	
-		scope = old_scope;
 		return false;
 	}
 	
