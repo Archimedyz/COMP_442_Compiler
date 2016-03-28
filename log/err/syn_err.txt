@@ -1,2 +1,4 @@
-Syntax Error - (2:14): expected ']', found '-'.
-Syntax Error - (3:16): Unexpected token '+'.
+Syntax Error - (6:0): expected ';', found '}'.
+Syntax Error - (8:0): Unexpected token 'class'.
+Syntax Error - (8:8): expected an identifier, found '{'.
+Syntax Error - (9:6): expected '(', found 'c_ref'.

@@ -7,8 +7,12 @@ public class SymbolTable {
 	ArrayList<Entry> entries;
 	String scope_name;
 	SymbolTable parent_scope;
+	int mId;
+	
+	private static int next_id = 1;
 	
 	public SymbolTable(String scope_name) {
+		mId = next_id++;
 		entries = new ArrayList<>();
 		this.scope_name = scope_name;
 		this.parent_scope = null;
@@ -61,6 +65,10 @@ public class SymbolTable {
 		return scope_name;
 	}
 	
+	public int getId() {
+		return mId;
+	}
+	
 	public SymbolTable getScopeOf(String name) {
 		for(Entry e : entries) {
 			if(e.name.equals(name)) {
@@ -73,10 +81,10 @@ public class SymbolTable {
 	@Override
 	public String toString() {
 		
-		String table_rep = "SCOPE: " + scope_name + "\n";
+		String table_rep = "SCOPE: " + scope_name + " [ID: " + mId + "]\n";
 		String sub_table_rep = "";
 		for(Entry e : entries) {
-			table_rep += "[" + e.name + ", " + e.kind + ", " + e.type + ", " + (e.scope == null ? "NO" : "YES") + "]\n";
+			table_rep += "[" + e.name + ", " + e.kind + ", " + e.type + ", " + (e.scope == null ? "NO" : e.scope.getId()) + "]\n";
 			if(e.scope != null) {
 				sub_table_rep += "\n" + e.scope.toString();
 			}

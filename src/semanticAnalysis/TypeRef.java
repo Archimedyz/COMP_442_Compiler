@@ -20,7 +20,12 @@ public class TypeRef {
 	}
 	public void copy(Entry e) {
 		this.val = e.type;
+		this.indices = 0;
 		this.dimension = e.dimension;
 		this.array_sizes = e.array_sizes;
+	}
+	
+	public String toString() {
+		return val + " - (" + line + ":" + col + ") - " + indices + "/" + dimension + "";
 	}
 }

@@ -30,7 +30,7 @@ public class LexicalAnalyzer {
 			System.err.println("Cannot open log files. [lex]");
 		}
 		
-		this.curr_line = 0;
+		this.curr_line = 1;
 		this.curr_col = 0;
 		this.token_dfa = new DFA();
 		this.eof = true;
@@ -47,7 +47,7 @@ public class LexicalAnalyzer {
 			return false;
 		}
 		
-		curr_line = 0;
+		curr_line = 1;
 		curr_col = 0;
 		
 		eof = false;
