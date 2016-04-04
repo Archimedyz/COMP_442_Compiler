@@ -14,6 +14,7 @@ class Utility
 	float var2;
 	int findMax(int array[100])
 	{
+		int var1;
 		int maxValue;
 		int idx;
 		maxValue = array[100];

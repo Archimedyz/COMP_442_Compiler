@@ -7,22 +7,18 @@ import java.util.HashMap;
 import java.util.Map;
 
 import core.ParseTree;
-import lexicalAnalysis.LexToken;
-import lexicalAnalysis.LexicalAnalyzer;
-import semanticAnalysis.SymbolTable;
-import semanticAnalysis.TypeRef;
+import lexicalAnalysis.*;
+import semanticAnalysis.*;
 
 public class SyntacticAnalyzer {
 
 	private LexicalAnalyzer lexical_analyzer;
+	private SemanticAnalyzer semantic_analyzer;
 	
 	private LexToken lookahead;
 	
 	private PrintWriter syn_out;
 	private PrintWriter syn_err;
-	
-	private PrintWriter sem_out;
-	private PrintWriter sem_err;
 	
 	private boolean fileOpen;
 	
@@ -31,7 +27,6 @@ public class SyntacticAnalyzer {
 	private Map<String, String> firstSets;
 	private Map<String, String> followSets;
 	
-	private SymbolTable curr_scope;
 	private TypeRef int_type;
 	
 	// for error messages
@@ -40,18 +35,15 @@ public class SyntacticAnalyzer {
 	public SyntacticAnalyzer() {
 		// the lexical analyzer
 		lexical_analyzer = new LexicalAnalyzer();
+		semantic_analyzer = new SemanticAnalyzer();
+		
 		try {
 			syn_out = new PrintWriter("log/out/syn_out.txt");
 			syn_err = new PrintWriter("log/err/syn_err.txt");
 		} catch (FileNotFoundException e) {
 			System.err.println("Cannot open log files. [syn]");
 		}
-		try {
-			sem_out = new PrintWriter("log/out/sem_out.txt");
-			sem_err = new PrintWriter("log/err/sem_err.txt");
-		} catch (FileNotFoundException e) {
-			System.err.println("Cannot open log files. [sem]");
-		}
+		
 		fileOpen = false;
 		lookahead = null;
 		
@@ -60,7 +52,6 @@ public class SyntacticAnalyzer {
 		firstSets = new HashMap<>();
 		followSets = new HashMap<>();
 		
-		curr_scope = null;
 		int_type = new TypeRef();
 		int_type.val = "int";
 		
@@ -80,7 +71,7 @@ public class SyntacticAnalyzer {
 		lookahead = nextToken();
 		if(prog() && match("_EOF")) {
 			syn_out.write(parseTree.toString());
-			sem_out.write(curr_scope.toString());
+			semantic_analyzer.print();
 			return true; // compile successful
 		}
 		return false;
@@ -96,30 +87,24 @@ public class SyntacticAnalyzer {
 		} catch (FileNotFoundException e) {
 			System.err.println("Cannot open log files. [syn]");
 		}
-		
-		sem_out.close();
-		sem_err.close();
-		try {
-			sem_out = new PrintWriter("log/out/sem_out.txt");
-			sem_err = new PrintWriter("log/err/sem_err.txt");
-		} catch (FileNotFoundException e) {
-			System.err.println("Cannot open log files. [sem]");
-		}
 				
 		if(!lexical_analyzer.openSource(src_file_path)) {
 			fileOpen = false;
 			return false;
 		}
+		
+		// also open the semantic analysis out files
+		semantic_analyzer.openSource();
+		
 		fileOpen = true;
 		return true;
 	}
 	
 	public void finalize() {
 		lexical_analyzer.finalize();
+		semantic_analyzer.finalize();
 		syn_out.close();
 		syn_err.close();
-		sem_out.close();
-		sem_err.close();
 	}
 	
 	private boolean match(String token_name, TypeRef ... ret) {
@@ -223,212 +208,7 @@ public class SyntacticAnalyzer {
 	
 	// Semantic Functions - BEGIN
 	
-	private boolean addEntry(String name, String kind, TypeRef type) {
-		
-		if(type.val.equals("class")) {
-			type.val = null;
-		}
-		
-		// First determine there is no redefinition within the current_scope
-		if(curr_scope.search(name)) {
-			sem_err.println("Semantic Error - (" + type.line + ":" + type.col + "): Multiple declaration: '" + (type.val == null ? "" : (type.val + " ")) + name + "' (" + kind + ").");
-			name += " +"; // add a space and then symbol to the name so that matches for it cannot be found in the table, but also so that it is ignored entirely without affecting the compilation
-		}
-		// add the scope anyway for now.
-		SymbolTable next_scope = curr_scope.createEntry(name, kind, type.val, type.dimension, type.array_sizes).getScope();
-		if(next_scope != null) { // if the added entry contains a scope, move into it.
-			curr_scope = next_scope;
-		}
-		
-		return true;
-	}
 	
-	private boolean popScope() {
-		curr_scope = (curr_scope.getParentScope() == null) ? curr_scope : curr_scope.getParentScope();
-		return true;
-	}
-	
-	/*
-	 * This Function checks whether the variable/array has been declared in the current scope, or super-scopes 
-	 */
-	private boolean variableCheck(TypeRef name) {
-		SymbolTable search_scope = curr_scope;
-		while(search_scope != null) {
-			if(search_scope.search(name.val, "variable") || search_scope.search(name.val, "array")) {
-				return true;
-			}
-			search_scope = search_scope.getParentScope();
-		}
-		
-		// if the variable was not in the scope, we will be here, and can display an error
-		sem_err.println("Semantic Error - (" + name.line + ":" + name.col + "): Undefined variable: '" + name.val + "'.");
-		
-		return true;
-	}
-	
-	/*
-	 * This Function checks whether the class has been declared in the current scope, or super-scopes 
-	 */
-	private boolean classCheck(TypeRef name) {
-		SymbolTable search_scope = curr_scope;
-		while(search_scope != null) {
-			if(search_scope.search(name.val, "class")) {
-				return true;
-			}
-			search_scope = search_scope.getParentScope();
-		}
-		
-		// if the variable was not in the scope, we will be here, and can display an error
-		sem_err.println("Semantic Error - (" + name.line + ":" + name.col + "): Undefined class: '" + name.val + "'.");
-		
-		return true;
-	}
-	
-	/*
-	 * This function check that both types match for an operation.
-	 */
-	private boolean typeMatch(TypeRef t1, TypeRef t2) {
-		
-		if(t1.val.equals("_typeerror_") || t2.val.equals("_typeerror_")) {
-			// a type error was already detected, so we can ignore this and move on.
-			return true;
-		}
-		
-		if(!t1.val.equals(t2.val) || (t1.dimension - t1.indices) != (t2.dimension - t2.indices)) {
-			sem_err.println("Semantic Error - (" + t1.line + ":" + t1.col + "): Type mismatch: cannot convert type '" + t2.val + indiceStr(t2.dimension - t2.indices) + "' to type '" + t1.val + indiceStr(t1.dimension - t1.indices) + "'.");
-			// change the type of the latter to typeerror
-			t2.val = "_typeerror_";
-		}
-		
-		return true;
-	}
-	
-	private String indiceStr(int boxes) {
-		String str = "";
-		
-		while(boxes > 0) {
-			str += "[]";
-			--boxes;
-		}
-		
-		return str;
-	}
-	
-	private boolean getType(TypeRef name, TypeRef type, SymbolTable... scopes) {
-		SymbolTable search_scope = curr_scope;
-		if(scopes.length > 0) {
-			search_scope = scopes[0];
-		}
-		while(search_scope != null) {
-			if(search_scope.search(name.val)) {
-				search_scope.getType(name.val, type);
-				type.line = name.line;
-				type.col = name.col;
-				return true;
-			}
-			search_scope = search_scope.getParentScope();
-		}
-		type.val = "_typeerror_";
-		return true;
-	}
-	
-	private boolean indexVar(TypeRef name, TypeRef type) {
-		if(type.indices < type.dimension) {
-			++type.indices;	
-		} else {
-			sem_err.println("Semantic Error - (" + type.line + ":" + type.col + "): Dimension out of bounds. Identifier '" + name.val + "' has a dimension of " + type.dimension + ".");
-		}
-		return true;
-	}
-	
-	private boolean checkReturnType(TypeRef type) {
-		// make sure we are in a function scope.
-		SymbolTable parent_scope = curr_scope.getParentScope();
-		if(parent_scope == null) {
-			sem_err.println("Parsing Error. Return in global scope.");
-		}
-		
-		TypeRef return_type = new TypeRef();
-		parent_scope.getType(curr_scope.getScopeName(), return_type);
-		
-		if(!return_type.val.equals(type.val)) {
-			sem_err.println("Semantic Error - (" + type.line + ":" + type.col + "): Function " + curr_scope.getScopeName() + ": return type must be '" + return_type.val + "'.");
-		}
-		
-		return true;
-	}
-	
-	/*
-	 * This function determines whether the attribute/function can be found in the provided type.
-	 */
-	private boolean getAttributeType(TypeRef type, TypeRef name, TypeRef attr_type) {
-		if(type.dimension - type.indices != 0) {
-			sem_err.println("Semantic Error - (" + name.line + ":" + name.col + "): Array type cannot have attribute.");
-			return true;
-		}
-		
-		
-		
-		// 1: find the entry for the type being called
-		SymbolTable search_scope = curr_scope;
-		while(search_scope != null) {
-			if(search_scope.search(type.val)) {
-				// the correct attribute had been found. now determine if it has the required attribute.
-				search_scope = search_scope.getScopeOf(type.val);
-				if(search_scope == null) {
-					sem_err.println("Semantic Error - (" + name.line + ":" + name.col + "): Identifier '" + type.val + "' has no attributes.");
-					attr_type.val = "_typeerror_";
-				} else if (!search_scope.search(name.val)) {
-					sem_err.println("Semantic Error - (" + name.line + ":" + name.col + "): Undefined attribute/function '" + name.val + "'.");
-					attr_type.val = "_typeerror_";
-				} else {
-					search_scope.getType(name.val, attr_type);
-				}
-				break;
-			}
-		}
-		
-		return true;
-	}
-	
-	private boolean addIndice(TypeRef type, TypeRef size) {
-		try {
-			int int_size = Integer.parseInt(size.val); 
-			if(int_size <= 0) {
-				sem_err.println("Semantic Error - (" + type.line + ":" + type.col + "): Array size must be >= 1.");
-			} else {
-				++type.dimension;
-				type.array_sizes.add(int_size);
-			}
-		} catch(NumberFormatException e) {
-			sem_err.println("Parsing Error: (" + type.line + ":" + type.col + "): Could not convert String to int: " + size.val + ".");
-		}
-		return true;
-	}
-	
-	private boolean functionCheck(TypeRef name, SymbolTable var_scope) {
-		
-		if(var_scope != null && var_scope.search(name.val, "function")) {
-			return true;
-		}
-		
-		sem_err.println("Semantic Error - (" + name.line + ":" + name.col + "): Undefined function: '" + name.val + "'.");
-		
-		return true;
-	}
-	
-	private boolean updateScope(TypeRef type, SymbolTable var_scope) {
-		SymbolTable search_scope = var_scope;
-		while(search_scope != null) {
-			if(search_scope.search(type.val)) {
-				var_scope.copy(search_scope.getScopeOf(type.val));
-				return true;
-			}
-			search_scope = search_scope.getParentScope();
-		}
-		
-		return true;
-	}
 	// Semantic Functions - END
 	
 	
@@ -438,9 +218,6 @@ public class SyntacticAnalyzer {
 		if(!skipErrors("prog")) {
 			return false;
 		}
-		
-		// create the global symbol table.
-		curr_scope = new SymbolTable("global");
 		
 		// add the node for this production.
 		parseDown();
@@ -468,7 +245,7 @@ public class SyntacticAnalyzer {
 		parseDown();
 		
 		if(("_CLASS").contains(lookahead.token_name)) {
-			if(match("_CLASS") && match("_ID", class_id) && addEntry(class_id.val, "class", class_id) && match("_LB") && varThenFunc() && match("_RB") && match("_SCOLON") && popScope() && classDecl()) {
+			if(match("_CLASS") && match("_ID", class_id) && semantic_analyzer.addEntry(class_id.val, "class", class_id) && match("_LB") && varThenFunc() && match("_RB") && match("_SCOLON") && semantic_analyzer.popScope() && classDecl()) {
 				print("<classDecl> ::= class id { <varThenFunc> } ; <classDecl>");
 				parseUp();
 				return true;
@@ -519,13 +296,13 @@ public class SyntacticAnalyzer {
 		parseDown();
 		
 		if(("_LSB _SCOLON").contains(lookahead.token_name)) {
-			if(arraySize(type) && addEntry(name.val, "variable", type) && match("_SCOLON") && varThenFunc()) {
+			if(arraySize(type) && semantic_analyzer.addEntry(name.val, "variable", type) && match("_SCOLON") && varThenFunc()) {
 				print("<varOrFunc> ::= <arraySize> ; <varThenFunc>");
 				parseUp();
 				return true;
 			} 
 		} else if(("_LP").contains(lookahead.token_name)){
-			if (addEntry(name.val, "function", type) && match("_LP") && fParams() && match("_RP") && funcBody() && match("_SCOLON") && popScope() && funcDef()) {
+			if (semantic_analyzer.addEntry(name.val, "function", type) && match("_LP") && fParams() && match("_RP") && funcBody() && match("_SCOLON") && semantic_analyzer.popScope() && funcDef()) {
 				print("<varOrFunc> ::= ( <fparams> ) <funcBody> ; <funcDef>");
 				parseUp();
 				return true;
@@ -588,7 +365,7 @@ public class SyntacticAnalyzer {
 		parseDown();
 		
 		if(("_ID _FLOAT _INT").contains(lookahead.token_name)) {
-			if(funcHead(type, name) && addEntry(name.val, "function", type) && funcBody() && match("_SCOLON") && popScope() && funcDef()) {
+			if(funcHead(type, name) && semantic_analyzer.addEntry(name.val, "function", type) && funcBody() && match("_SCOLON") && semantic_analyzer.popScope() && funcDef()) {
 				print("<funcDef> ::= <funcHead> <funcBody> ; <funcDef>");
 				parseUp();
 				return true;
@@ -673,7 +450,7 @@ public class SyntacticAnalyzer {
 		parseDown();
 		
 		if(("_ID").contains(lookahead.token_name)) {
-			if(classCheck(type) && varTail(type) && varThenStat()) {
+			if(semantic_analyzer.classCheck(type) && varTail(type) && varThenStat()) {
 				print("<varOrStat> ::= <varTail> <varThenStat>");
 				parseUp();
 				return true;
@@ -681,7 +458,7 @@ public class SyntacticAnalyzer {
 		} else if(("_LSB _DOT _EQUAL").contains(lookahead.token_name)) {
 			name = type;
 			type = new TypeRef();
-			if (variableCheck(name) && getType(name, type) && indice(name, type) && idnest(type) && assignOp() && expr(right_type) && match("_SCOLON") && typeMatch(type, right_type) && mStatement()) {
+			if (semantic_analyzer.variableCheck(name) && semantic_analyzer.getType(name, type) && indice(name, type) && idnest(type) && assignOp() && expr(right_type) && match("_SCOLON") && semantic_analyzer.typeMatch(type, right_type) && mStatement()) {
 				print("<varOrStat> ::= <indice> <idnest> <assignOp> <expr> ; <mStatement>");
 				parseUp();
 				return true;
@@ -703,7 +480,7 @@ public class SyntacticAnalyzer {
 		parseDown();		
 		
 		if(("_ID").contains(lookahead.token_name)) {
-			if(match("_ID", name) && arraySize(type) && addEntry(name.val, "variable", type) && match("_SCOLON")) {
+			if(match("_ID", name) && arraySize(type) && semantic_analyzer.addEntry(name.val, "variable", type) && match("_SCOLON")) {
 				print("<varTail> ::= id <arraySize> ;");
 				parseUp();
 				return true;
@@ -754,7 +531,7 @@ public class SyntacticAnalyzer {
 		parseDown();
 				
 		if(("_RETURN").contains(lookahead.token_name)) {
-			if(match("_RETURN") && match("_LP") && expr(type) && match("_RP") && match("_SCOLON") && checkReturnType(type)) {
+			if(match("_RETURN") && match("_LP") && expr(type) && match("_RP") && match("_SCOLON") && semantic_analyzer.checkReturnType(type)) {
 				print("<statementRes> ::= return ( <expr> ) ;");
 				parseUp();
 				return true;
@@ -772,13 +549,13 @@ public class SyntacticAnalyzer {
 				return true;
 			} 
 		} else if(("_IF").contains(lookahead.token_name)) {
-			if (match("_IF") && match("_LP") && expr(type) && typeMatch(type, int_type) && match("_RP") && match("_THEN") && statBlock() && match("_ELSE") && statBlock() && match("_SCOLON")) {
+			if (match("_IF") && match("_LP") && expr(type) && semantic_analyzer.typeMatch(type, int_type) && match("_RP") && match("_THEN") && statBlock() && match("_ELSE") && statBlock() && match("_SCOLON")) {
 				print("<statementRes> ::= if ( <expr> ) then <statblock> else <statblock> ;");
 				parseUp();
 				return true;
 			} 
 		} else if(("_FOR").contains(lookahead.token_name)) {
-			if (match("_FOR") && match("_LP") && type(type) && match("_ID", name) && addEntry(name.val, "variable", type) && assignOp() && expr(right_type) && match("_SCOLON") && typeMatch(type, right_type) && relExpr() && match("_SCOLON") && assignStat() && match("_RP") && statBlock() && match("_SCOLON")) {
+			if (match("_FOR") && match("_LP") && type(type) && match("_ID", name) && semantic_analyzer.addEntry(name.val, "variable", type) && assignOp() && expr(right_type) && match("_SCOLON") && semantic_analyzer.typeMatch(type, right_type) && relExpr() && match("_SCOLON") && assignStat() && match("_RP") && statBlock() && match("_SCOLON")) {
 				print("<statementRes> ::= for ( <type> id <assignOp> <expr> ; relExpr ; assignStat ) statBlock ;");
 				parseUp();
 				return true;
@@ -825,7 +602,7 @@ public class SyntacticAnalyzer {
 		parseDown();
 		
 		if(("_ID").contains(lookahead.token_name)) {
-			if(variable(type1) && assignOp() && expr(type2) && typeMatch(type1, type2)) {
+			if(variable(type1) && assignOp() && expr(type2) && semantic_analyzer.typeMatch(type1, type2)) {
 				print("<assignStat> ::= <variable> <assingOp> <expr>");
 				parseUp();
 				return true;
@@ -897,7 +674,7 @@ public class SyntacticAnalyzer {
 		parseDown();
 		
 		if(("_LT _GT _RELOP").contains(lookahead.token_name)) {
-			if(relOp() && arithExpr(right_type) && typeMatch(left_type, right_type)) {
+			if(relOp() && arithExpr(right_type) && semantic_analyzer.typeMatch(left_type, right_type)) {
 				print("<relExprPart> ::= <relOp> <arithExpr>");
 				if(!right_type.val.equals("_typeerror_")) {
 					left_type.val = "int"; // convert the relation to int for boolean.
@@ -927,7 +704,7 @@ public class SyntacticAnalyzer {
 		parseDown();
 		
 		if(("_LP _NOT _ID _FNUM _INUM _ADDOP").contains(lookahead.token_name)) {
-			if(arithExpr(left_type) && relOp() && arithExpr(right_type) && typeMatch(left_type, right_type)) {
+			if(arithExpr(left_type) && relOp() && arithExpr(right_type) && semantic_analyzer.typeMatch(left_type, right_type)) {
 				print("<relExpr> ::= <arithExpr> <relOp> <arithExpr>");
 				parseUp();
 				return true;
@@ -969,7 +746,7 @@ public class SyntacticAnalyzer {
 		parseDown();
 		
 		if(("_ADDOP _OR").contains(lookahead.token_name)) {
-			if(addOp() && term(right_type) && arithExprTail(right_type) && typeMatch(type, right_type)) {
+			if(addOp() && term(right_type) && arithExprTail(right_type) && semantic_analyzer.typeMatch(type, right_type)) {
 				print("<arithExprTail> ::= <addOp> <term> <arithExprTail>");
 				parseUp();
 				return true;
@@ -1038,7 +815,7 @@ public class SyntacticAnalyzer {
 		parseDown();
 		
 		if(("_MULTOP _AND").contains(lookahead.token_name)) {
-			if(multOp() && factor(right_type) && termTail(right_type) && typeMatch(type, right_type)) {
+			if(multOp() && factor(right_type) && termTail(right_type) && semantic_analyzer.typeMatch(type, right_type)) {
 				print("<termTail> ::= <multOp> <factor> <termTail>");
 				parseUp();
 				return true;
@@ -1074,13 +851,13 @@ public class SyntacticAnalyzer {
 				return true;
 			}
 		} else if(("_ID").contains(lookahead.token_name)) {
-			if (varOrFuncCall(type, curr_scope)) {
+			if (varOrFuncCall(type, semantic_analyzer.getCurrentScope())) {
 				print("<factor> ::= <varOrFuncCall>");
 				parseUp();
 				return true;
 			}
 		} else if(("_NOT").contains(lookahead.token_name)) {
-			if (match("_NOT") && factor(type) && typeMatch(type, int_type)) {
+			if (match("_NOT") && factor(type) && semantic_analyzer.typeMatch(type, int_type)) {
 				print("<factor> ::= not <factor>");
 				parseUp();
 				return true;
@@ -1111,7 +888,7 @@ public class SyntacticAnalyzer {
 		parseDown();		
 		
 		if(("_ID").contains(lookahead.token_name)) {
-			if(match("_ID", name) && getType(name, type, new_scope) && varOrFuncCallTail(name, type, new_scope)) {
+			if(match("_ID", name) && semantic_analyzer.getType(name, type, new_scope) && varOrFuncCallTail(name, type, new_scope)) {
 				print("<varOrFuncCall> ::= id <varOrFuncCallTail>");
 				parseUp();
 				return true;
@@ -1137,7 +914,7 @@ public class SyntacticAnalyzer {
 				return true;
 			} 
 		} else if(("_LP").contains(lookahead.token_name)) {
-			if (functionCheck(name, scope) && match("_LP") && aParams() && match("_RP")) {
+			if (semantic_analyzer.functionCheck(name, scope) && match("_LP") && aParams() && match("_RP")) {
 				print("<varOrFuncCallTail> ::= ( <aParams> )");
 				parseUp();
 				return true;
@@ -1161,7 +938,7 @@ public class SyntacticAnalyzer {
 		parseDown();
 		
 		if(("_DOT").contains(lookahead.token_name)) {
-			if(match("_DOT") && updateScope(type, scope) && varOrFuncCall(type, scope)) {
+			if(match("_DOT") && semantic_analyzer.updateScope(type, scope) && varOrFuncCall(type, scope)) {
 				print("<varOrFuncCallTailTail> ::= . <varOrFuncCall>");
 				parseUp();
 				return true;
@@ -1187,7 +964,7 @@ public class SyntacticAnalyzer {
 		parseDown();
 				
 		if(("_ID").contains(lookahead.token_name)) {
-			if(match("_ID", name) && variableCheck(name) && getType(name, type) && indice(name, type) && idnest(type)) {
+			if(match("_ID", name) && semantic_analyzer.variableCheck(name) && semantic_analyzer.getType(name, type) && indice(name, type) && idnest(type)) {
 				print("<variable> ::= id <indice> <idnest>");
 				parseUp();
 				return true;
@@ -1209,7 +986,7 @@ public class SyntacticAnalyzer {
 		parseDown();
 		
 		if(("_DOT").contains(lookahead.token_name)) {
-			if(match("_DOT") && match("_ID", name) && getAttributeType(type, name, type) && indice(name, type) && idnest(type)) {
+			if(match("_DOT") && match("_ID", name) && semantic_analyzer.getAttributeType(type, name, type) && indice(name, type) && idnest(type)) {
 				print("<idnest> ::= . id <indice> <idnest>");
 				parseUp();
 				return true;
@@ -1235,7 +1012,7 @@ public class SyntacticAnalyzer {
 		parseDown();
 		
 		if(("_LSB").contains(lookahead.token_name)) {
-			if(indexVar(name, type) && match("_LSB") && arithExpr(index_type) && typeMatch(index_type, int_type) && match("_RSB") && indice(name, type)) {
+			if(semantic_analyzer.indexVar(name, type) && match("_LSB") && arithExpr(index_type) && semantic_analyzer.typeMatch(index_type, int_type) && match("_RSB") && indice(name, type)) {
 				print("<indice> ::= [ <arithExpr> ] <indice>");
 				parseUp();
 				return true;
@@ -1261,7 +1038,7 @@ public class SyntacticAnalyzer {
 		parseDown();
 		
 		if(("_LSB").contains(lookahead.token_name)) {
-			if(match("_LSB") && match("_INUM", size) && match("_RSB") && addIndice(type, size) && arraySize(type)) {
+			if(match("_LSB") && match("_INUM", size) && match("_RSB") && semantic_analyzer.addIndice(type, size) && arraySize(type)) {
 				print("<arraySize> ::= [ inum ] <arraySize>");
 				parseUp();
 				return true;
@@ -1293,7 +1070,7 @@ public class SyntacticAnalyzer {
 				return true;
 			} 
 		} else if(("_ID").contains(lookahead.token_name)) {
-			if (match("_ID", type) && classCheck(type)) {
+			if (match("_ID", type) && semantic_analyzer.classCheck(type)) {
 				print("<type> ::= id");
 				parseUp();
 				return true;
@@ -1342,7 +1119,7 @@ public class SyntacticAnalyzer {
 		parseDown();
 		
 		if(("_ID _FLOAT _INT").contains(lookahead.token_name)) {
-			if(type(type) && match("_ID", name) && arraySize(type) && addEntry(name.val, "parameter", type) && fParamsTail()) {
+			if(type(type) && match("_ID", name) && arraySize(type) && semantic_analyzer.addEntry(name.val, "parameter", type) && fParamsTail()) {
 				print("<fParams> ::= <type> id <arraySize> <fParamsTail>");
 				parseUp();
 				return true;
@@ -1395,7 +1172,7 @@ public class SyntacticAnalyzer {
 		parseDown();
 		
 		if(("_COMMA").contains(lookahead.token_name)) {
-			if(match("_COMMA") && type(type) && match("_ID", name) && arraySize(type) && addEntry(name.val, "parameter", type) && fParamsTail()) {
+			if(match("_COMMA") && type(type) && match("_ID", name) && arraySize(type) && semantic_analyzer.addEntry(name.val, "parameter", type) && fParamsTail()) {
 				print("<fParamsTail> ::= , <type> id <arraySize> <fParamsTail>");
 				parseUp();
 				return true;
