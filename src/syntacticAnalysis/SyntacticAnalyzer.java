@@ -3,12 +3,16 @@ package syntacticAnalysis;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
 import core.ParseTree;
-import lexicalAnalysis.*;
-import semanticAnalysis.*;
+import lexicalAnalysis.LexToken;
+import lexicalAnalysis.LexicalAnalyzer;
+import semanticAnalysis.SemanticAnalyzer;
+import semanticAnalysis.SymbolTable;
+import semanticAnalysis.TypeRef;
 
 public class SyntacticAnalyzer {
 
@@ -914,7 +918,8 @@ public class SyntacticAnalyzer {
 				return true;
 			} 
 		} else if(("_LP").contains(lookahead.token_name)) {
-			if (semantic_analyzer.functionCheck(name, scope) && match("_LP") && aParams() && match("_RP")) {
+			ArrayList<TypeRef> argList = new ArrayList<>();
+			if (match("_LP") && aParams(argList) && match("_RP") && semantic_analyzer.functionCheck(name, scope, argList, type)) {
 				print("<varOrFuncCallTail> ::= ( <aParams> )");
 				parseUp();
 				return true;
@@ -1133,7 +1138,7 @@ public class SyntacticAnalyzer {
 		return false;
 	}
 
-	private boolean aParams() {
+	private boolean aParams(ArrayList<TypeRef> argsList) {
 		// skip errors
 		if(!skipErrors("aParams")) {
 			return false;
@@ -1145,7 +1150,7 @@ public class SyntacticAnalyzer {
 		parseDown();
 				
 		if(("_LP _NOT _ID _FNUM _INUM _ADDOP").contains(lookahead.token_name)) {
-			if(expr(type) && aParamsTail()) {
+			if(expr(type) && argsList.add(type) && aParamsTail(argsList)) {
 				print("<aParams> ::= <expr> <aParamsTail>");
 				parseUp();
 				return true;
@@ -1186,7 +1191,7 @@ public class SyntacticAnalyzer {
 		return false;
 	}
 	
-	private boolean aParamsTail() {
+	private boolean aParamsTail(ArrayList<TypeRef> argsList) {
 		// skip errors
 		if(!skipErrors("aParamsTail")) {
 			return false;
@@ -1198,7 +1203,7 @@ public class SyntacticAnalyzer {
 		parseDown();
 		
 		if(("_COMMA").contains(lookahead.token_name)) {
-			if(match("_COMMA") && expr(type) && aParamsTail()) {
+			if(match("_COMMA") && expr(type) && argsList.add(type) && aParamsTail(argsList)) {
 				print("<aParamsTail> ::= , <expr> <aParamsTail>");
 				parseUp();
 				return true;

@@ -26,6 +26,10 @@ public class TypeRef {
 	}
 	
 	public String toString() {
-		return val + " - (" + line + ":" + col + ") - " + indices + "/" + dimension + "";
+		String ret = val + "";
+		for(int size : array_sizes) {
+			ret += "[" + size + "]";
+		}
+		return ret;
 	}
 }

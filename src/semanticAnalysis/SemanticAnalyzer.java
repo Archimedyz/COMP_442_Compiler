@@ -161,23 +161,12 @@ public class SemanticAnalyzer {
 		}
 		
 		if(!t1.val.equals(t2.val) || (t1.dimension - t1.indices) != (t2.dimension - t2.indices)) {
-			sem_err.println("Semantic Error - (" + t1.line + ":" + t1.col + "): Type mismatch: cannot convert type '" + t2.val + indiceStr(t2.dimension - t2.indices) + "' to type '" + t1.val + indiceStr(t1.dimension - t1.indices) + "'.");
+			sem_err.println("Semantic Error - (" + t1.line + ":" + t1.col + "): Type mismatch: cannot convert type '" + t2.toString() + "' to type '" + t1.toString() + "'.");
 			// change the type of the latter to typeerror
 			t2.val = "_typeerror_";
 		}
 		
 		return true;
-	}
-	
-	public String indiceStr(int boxes) {
-		String str = "";
-		
-		while(boxes > 0) {
-			str += "[]";
-			--boxes;
-		}
-		
-		return str;
 	}
 	
 	public boolean getType(TypeRef name, TypeRef type, SymbolTable... scopes) {
@@ -272,13 +261,40 @@ public class SemanticAnalyzer {
 		return true;
 	}
 	
-	public boolean functionCheck(TypeRef name, SymbolTable var_scope) {
-		
+	public boolean functionCheck(TypeRef name, SymbolTable var_scope, ArrayList<TypeRef> argsList, TypeRef type) {
+				
 		if(var_scope != null && var_scope.search(name.val, "function")) {
-			return true;
+			ArrayList<Entry> functions = var_scope.getDefinedFunctions(name.val);
+			boolean fmatch = true;
+			for(Entry func : functions) {
+				fmatch = true;
+				ArrayList<Entry> params = func.scope.getAllEntriesOfKind("parameter");
+				if(params.size() != argsList.size()) {
+					continue;
+				} 
+				for(int i = 0; i < params.size(); ++i) {
+					TypeRef paramType = new TypeRef();
+					func.scope.getType(params.get(i).name, paramType);
+					if(!typeMatch(argsList.get(i), paramType)) {
+						fmatch = false;
+						break;
+					}
+				}
+				if(fmatch) {
+					type.val = func.type;
+					return true;
+				}
+			}
 		}
 		
-		sem_err.println("Semantic Error - (" + name.line + ":" + name.col + "): Undefined function: '" + name.val + "'.");
+		String argsListStr = "(";
+		for(int i = 0; i < argsList.size(); ++i) {
+			argsListStr +=  (i == 0 ? "" : ", ") + argsList.get(i).toString();
+		}
+		argsListStr += ")";
+		
+		sem_err.println("Semantic Error - (" + name.line + ":" + name.col + "): Undefined function: " + name.val + argsListStr + ".");
+		type.val = "_typeerror_";
 		
 		return true;
 	}
