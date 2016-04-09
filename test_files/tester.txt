@@ -1,0 +1,13 @@
+class A {
+
+	int foo(int a) {
+	
+	};
+	
+	float foo(int b) {
+	
+	};
+
+};
+
+program {};

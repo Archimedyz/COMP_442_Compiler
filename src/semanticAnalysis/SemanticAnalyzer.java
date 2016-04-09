@@ -2,6 +2,9 @@ package semanticAnalysis;
 
 import java.io.FileNotFoundException;
 import java.io.PrintWriter;
+import java.util.ArrayList;
+
+import semanticAnalysis.SymbolTable.Entry;
 
 public class SemanticAnalyzer {
 
@@ -65,15 +68,44 @@ public class SemanticAnalyzer {
 		return true;
 	}
 	
-	public boolean finalizeEntry() {
+	public boolean finalizeEntry(String name, String kind) {
 		// determine if the function has been already defined.
-		if(kind.equals("function")) { // otherwise check for mutiple declaration
-			sem_err.println("Semantic Error - (" + type.line + ":" + type.col + "): Multiple declaration: '" + (type.val == null ? "" : (type.val + " ")) + name + "' (" + kind + ").");
-			name += " +"; // add a space and then symbol to the name so that matches for it cannot be found in the table, but also so that it is ignored entirely without affecting the compilation
+		if(kind.equals("function")) { // otherwise check for multiple declaration
+			// find all defined function with the function name provided.
+			ArrayList<Entry> defined = curr_scope.getDefinedFunctions(name);
+			Entry pending = curr_scope.getPendingEntry();
+			for(Entry func : defined) {
+				if(parameterCheck(pending, func)) {
+					pending.name += " +";
+					name += " +";
+					break;
+				}
+			}
+		}
+		if(!name.contains("+")) { // this is fine since ids cannot contain the plus symbol.
+			curr_scope.finalize();
 		}
 		
-		curr_scope.finalize();
+		return true;
+	}
+	
+	private boolean parameterCheck(Entry func1, Entry func2) {
 		
+		ArrayList<Entry> params1 = func1.scope.getAllEntriesOfKind("parameter");
+		ArrayList<Entry> params2 = func2.scope.getAllEntriesOfKind("parameter");
+		
+		if(params1.size() != params2.size()) {
+			return false;
+		}
+				
+		// now compare the order and type of each argument. since they have the same number of parameters.
+		for(int i = 0; i < params1.size(); ++i) {
+			if(!params1.get(i).type.equals(params2.get(i).type)) {
+				return false;
+			}
+		}
+		
+		// if the number of parameters is the same, and the type+order of each parameter is the same, return true.
 		return true;
 	}
 	

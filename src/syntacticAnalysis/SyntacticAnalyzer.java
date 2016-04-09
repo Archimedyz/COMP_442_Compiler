@@ -245,7 +245,7 @@ public class SyntacticAnalyzer {
 		parseDown();
 		
 		if(("_CLASS").contains(lookahead.token_name)) {
-			if(match("_CLASS") && match("_ID", class_id) && semantic_analyzer.addEntry(class_id.val, "class", class_id) && match("_LB") && varThenFunc() && match("_RB") && match("_SCOLON") && semantic_analyzer.popScope() && classDecl()) {
+			if(match("_CLASS") && match("_ID", class_id) && semantic_analyzer.addEntry(class_id.val, "class", class_id) && match("_LB") && varThenFunc() && match("_RB") && match("_SCOLON") && semantic_analyzer.popScope() && semantic_analyzer.finalizeEntry(class_id.val, "class") && classDecl()) {
 				print("<classDecl> ::= class id { <varThenFunc> } ; <classDecl>");
 				parseUp();
 				return true;
@@ -296,13 +296,13 @@ public class SyntacticAnalyzer {
 		parseDown();
 		
 		if(("_LSB _SCOLON").contains(lookahead.token_name)) {
-			if(arraySize(type) && semantic_analyzer.addEntry(name.val, "variable", type) && match("_SCOLON") && varThenFunc()) {
+			if(arraySize(type) && semantic_analyzer.addEntry(name.val, "variable", type) && semantic_analyzer.finalizeEntry(name.val, "variable") && match("_SCOLON") && varThenFunc()) {
 				print("<varOrFunc> ::= <arraySize> ; <varThenFunc>");
 				parseUp();
 				return true;
 			} 
 		} else if(("_LP").contains(lookahead.token_name)){
-			if (semantic_analyzer.addEntry(name.val, "function", type) && match("_LP") && fParams() && match("_RP") && funcBody() && match("_SCOLON") && semantic_analyzer.popScope() && funcDef()) {
+			if (semantic_analyzer.addEntry(name.val, "function", type) && match("_LP") && fParams() && match("_RP") && funcBody() && match("_SCOLON") && semantic_analyzer.popScope() && semantic_analyzer.finalizeEntry(name.val, "function") && funcDef()) {
 				print("<varOrFunc> ::= ( <fparams> ) <funcBody> ; <funcDef>");
 				parseUp();
 				return true;
@@ -342,7 +342,7 @@ public class SyntacticAnalyzer {
 		parseDown();
 		
 		if(("_ID _FLOAT _INT").contains(lookahead.token_name)) {
-			if(type(type) && match("_ID", name) && match("_LP") && fParams() && match("_RP")) {
+			if(type(type) && match("_ID", name) && semantic_analyzer.addEntry(name.val, "function", type) && match("_LP") && fParams() && match("_RP")) {
 				print("<funcHead> ::= <type> id ( <fParams> )");
 				parseUp();
 				return true;
@@ -365,7 +365,7 @@ public class SyntacticAnalyzer {
 		parseDown();
 		
 		if(("_ID _FLOAT _INT").contains(lookahead.token_name)) {
-			if(funcHead(type, name) && semantic_analyzer.addEntry(name.val, "function", type) && funcBody() && match("_SCOLON") && semantic_analyzer.popScope() && funcDef()) {
+			if(funcHead(type, name) && funcBody() && match("_SCOLON") && semantic_analyzer.popScope() && semantic_analyzer.finalizeEntry(name.val, "function") && funcDef()) {
 				print("<funcDef> ::= <funcHead> <funcBody> ; <funcDef>");
 				parseUp();
 				return true;
@@ -480,7 +480,7 @@ public class SyntacticAnalyzer {
 		parseDown();		
 		
 		if(("_ID").contains(lookahead.token_name)) {
-			if(match("_ID", name) && arraySize(type) && semantic_analyzer.addEntry(name.val, "variable", type) && match("_SCOLON")) {
+			if(match("_ID", name) && arraySize(type) && semantic_analyzer.addEntry(name.val, "variable", type) && semantic_analyzer.finalizeEntry(name.val, "variable") && match("_SCOLON")) {
 				print("<varTail> ::= id <arraySize> ;");
 				parseUp();
 				return true;
@@ -555,7 +555,7 @@ public class SyntacticAnalyzer {
 				return true;
 			} 
 		} else if(("_FOR").contains(lookahead.token_name)) {
-			if (match("_FOR") && match("_LP") && type(type) && match("_ID", name) && semantic_analyzer.addEntry(name.val, "variable", type) && assignOp() && expr(right_type) && match("_SCOLON") && semantic_analyzer.typeMatch(type, right_type) && relExpr() && match("_SCOLON") && assignStat() && match("_RP") && statBlock() && match("_SCOLON")) {
+			if (match("_FOR") && match("_LP") && type(type) && match("_ID", name) && semantic_analyzer.addEntry(name.val, "variable", type) && semantic_analyzer.finalizeEntry(name.val, "variable") && assignOp() && expr(right_type) && match("_SCOLON") && semantic_analyzer.typeMatch(type, right_type) && relExpr() && match("_SCOLON") && assignStat() && match("_RP") && statBlock() && match("_SCOLON")) {
 				print("<statementRes> ::= for ( <type> id <assignOp> <expr> ; relExpr ; assignStat ) statBlock ;");
 				parseUp();
 				return true;
@@ -1119,7 +1119,7 @@ public class SyntacticAnalyzer {
 		parseDown();
 		
 		if(("_ID _FLOAT _INT").contains(lookahead.token_name)) {
-			if(type(type) && match("_ID", name) && arraySize(type) && semantic_analyzer.addEntry(name.val, "parameter", type) && fParamsTail()) {
+			if(type(type) && match("_ID", name) && arraySize(type) && semantic_analyzer.addEntry(name.val, "parameter", type) && semantic_analyzer.finalizeEntry(name.val, "parameter") && fParamsTail()) {
 				print("<fParams> ::= <type> id <arraySize> <fParamsTail>");
 				parseUp();
 				return true;
@@ -1172,7 +1172,7 @@ public class SyntacticAnalyzer {
 		parseDown();
 		
 		if(("_COMMA").contains(lookahead.token_name)) {
-			if(match("_COMMA") && type(type) && match("_ID", name) && arraySize(type) && semantic_analyzer.addEntry(name.val, "parameter", type) && fParamsTail()) {
+			if(match("_COMMA") && type(type) && match("_ID", name) && arraySize(type) && semantic_analyzer.addEntry(name.val, "parameter", type) && semantic_analyzer.finalizeEntry(name.val, "parameter") && fParamsTail()) {
 				print("<fParamsTail> ::= , <type> id <arraySize> <fParamsTail>");
 				parseUp();
 				return true;

@@ -59,6 +59,20 @@ public class SymbolTable {
 		} 
 	}
 	
+	public Entry getPendingEntry() {
+		return pending;
+	}
+	
+	public ArrayList<Entry> getAllEntriesOfKind(String kind) {
+		ArrayList<Entry> ret = new ArrayList<Entry>();
+		for(Entry e : entries) {
+			if(e.kind.equals(kind) && e.defined) {
+				ret.add(e);
+			}
+		}
+		return ret;
+	}
+	
 	/*
 	 * Search the symbol table for the entry name
 	 */
@@ -84,12 +98,12 @@ public class SymbolTable {
 	}
 	
 	/*
-	 * Return a list of all function entries with the name <i>name</i>.
+	 * Return a list of all function entries with the name <i>name</i> which have been successfully defined.
 	 */
-	public ArrayList<Entry> getFunctions(String name) {
+	public ArrayList<Entry> getDefinedFunctions(String name) {
 		ArrayList<Entry> ret = new ArrayList<>();		
 		for(Entry e : entries) {
-			if(e.name.equals(name) && e.kind.equals("function")) {
+			if(e.name.equals(name) && e.kind.equals("function") && e.defined) {
 				ret.add(e);
 			}
 		}		
@@ -156,7 +170,7 @@ public class SymbolTable {
 		String table_rep = "SCOPE: " + scope_name + " [ID: " + mId + "]\n";
 		String sub_table_rep = "";
 		for(Entry e : entries) {
-			table_rep += "(" + e.address + ")[" + e.name + ", " + e.kind + ", " + e.type + ", " + (e.defined ? "Defined" : "Undefined") + dimensionStr(e) + ", " + (e.scope == null ? "NO" : e.scope.getId()) + "]\n";
+			table_rep += "(" + e.address + ")[" + e.name + ", " + e.kind + ", " + e.type + dimensionStr(e) + ", " + (e.defined ? "Defined" : "Undefined") + ", " + (e.scope == null ? "NO" : e.scope.getId()) + "]\n";
 			if(e.scope != null) {
 				sub_table_rep += "\n" + e.scope.toString();
 			}
