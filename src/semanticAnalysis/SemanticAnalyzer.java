@@ -51,8 +51,8 @@ public class SemanticAnalyzer {
 			type.val = null;
 		}
 		
-		// First determine there is no redefinition within the current_scope
-		if(curr_scope.search(name)) {
+		// First determine if the addition is a function, and if it is, determine if it is valid overloading
+		if(!kind.equals("function") && curr_scope.search(name)) { // otherwise check for mutiple declaration
 			sem_err.println("Semantic Error - (" + type.line + ":" + type.col + "): Multiple declaration: '" + (type.val == null ? "" : (type.val + " ")) + name + "' (" + kind + ").");
 			name += " +"; // add a space and then symbol to the name so that matches for it cannot be found in the table, but also so that it is ignored entirely without affecting the compilation
 		}
@@ -61,6 +61,18 @@ public class SemanticAnalyzer {
 		if(next_scope != null) { // if the added entry contains a scope, move into it.
 			curr_scope = next_scope;
 		}
+		
+		return true;
+	}
+	
+	public boolean finalizeEntry() {
+		// determine if the function has been already defined.
+		if(kind.equals("function")) { // otherwise check for mutiple declaration
+			sem_err.println("Semantic Error - (" + type.line + ":" + type.col + "): Multiple declaration: '" + (type.val == null ? "" : (type.val + " ")) + name + "' (" + kind + ").");
+			name += " +"; // add a space and then symbol to the name so that matches for it cannot be found in the table, but also so that it is ignored entirely without affecting the compilation
+		}
+		
+		curr_scope.finalize();
 		
 		return true;
 	}

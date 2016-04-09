@@ -10,7 +10,7 @@ public class Compiler {
 	private String err_msg;
 	
 	public Compiler() {
-		// initialize th syntactic analyzer
+		// initialize the syntactic analyzer
 		syntactic_analyzer = new SyntacticAnalyzer();
 	}
 	

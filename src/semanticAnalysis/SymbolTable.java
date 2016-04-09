@@ -7,8 +7,11 @@ public class SymbolTable {
 	ArrayList<Entry> entries;
 	String scope_name;
 	SymbolTable parent_scope;
+	Entry parent_entry;
 	int mId;
 	
+	// the current pending entry.
+	Entry pending;
 
 	private static int next_address = 0;
 	private static int next_id = 1;
@@ -18,25 +21,47 @@ public class SymbolTable {
 	}
 	
 	public SymbolTable(String scope_name) {
-		mId = next_id++;
-		entries = new ArrayList<>();
+		this.mId = next_id++;
+		this.entries = new ArrayList<>();
 		this.scope_name = scope_name;
 		this.parent_scope = null;
+		this.parent_entry = null;
+		this.pending = null;
 	}
 	
+	/*
+	 *  Create an entry in the symbol table
+	 */
 	public Entry createEntry(String name, String kind, String type, int dimensions, ArrayList<Integer> array_sizes) {
 		Entry toAdd = new Entry(name, kind, type, dimensions, array_sizes);
 		
-		if(("class function").contains(kind)) {
+		if(kind.equals("parameter")) {
+			parent_entry.params.add(toAdd); // redundant on purpose
+		} else if(("class function").contains(kind)) {
 			toAdd.scope = new SymbolTable(name);
 			toAdd.scope.parent_scope = this;
+			toAdd.scope.parent_entry = toAdd;
 		}
 		
 		entries.add(toAdd);
+		pending = toAdd;
 		
 		return toAdd;
 	}
 	
+	/*
+	 * Finalizes an entry setting <i>defined</i> to <b>true</b>;
+	 */
+	public void finalize() {
+		if(pending != null) {
+			pending.defined = true;
+			pending = null;
+		} 
+	}
+	
+	/*
+	 * Search the symbol table for the entry name
+	 */
 	public boolean search(String name) {
 		for(Entry e : entries) {
 			if(e.name.equals(name)) {
@@ -46,6 +71,9 @@ public class SymbolTable {
 		return false;
 	}
 	
+	/*
+	 * Search the symbol table for an entry with a specific name and kind
+	 */
 	public boolean search(String name, String kind) {
 		for(Entry e : entries) {
 			if(e.name.equals(name) && e.kind.equals(kind)) {
@@ -55,6 +83,22 @@ public class SymbolTable {
 		return false;
 	}
 	
+	/*
+	 * Return a list of all function entries with the name <i>name</i>.
+	 */
+	public ArrayList<Entry> getFunctions(String name) {
+		ArrayList<Entry> ret = new ArrayList<>();		
+		for(Entry e : entries) {
+			if(e.name.equals(name) && e.kind.equals("function")) {
+				ret.add(e);
+			}
+		}		
+		return ret;
+	}
+	
+	/*
+	 * Determine the type of the given entry with name <i>name</i>.
+	 */
 	public void getType(String name, TypeRef type) {
 		for(Entry e : entries) {
 			if(e.name.equals(name)) {
@@ -63,18 +107,30 @@ public class SymbolTable {
 		}
 	}
 	
+	/*
+	 * Return the parent Symbol Table if it exists.
+	 */
 	public SymbolTable getParentScope() {
 		return parent_scope;
 	}
 	
+	/*
+	 * Return the Symbol Table name.
+	 */
 	public String getScopeName() {
 		return scope_name;
 	}
 	
+	/*
+	 * Return the Symbol Table ID.
+	 */
 	public int getId() {
 		return mId;
 	}
 	
+	/*
+	 * Return the Symbol Table of the specified entry
+	 */
 	public SymbolTable getScopeOf(String name) {
 		for(Entry e : entries) {
 			if(e.name.equals(name)) {
@@ -84,6 +140,9 @@ public class SymbolTable {
 		return null;
 	}
 	
+	/*
+	 * Copy a Symbol Table.
+	 */
 	public void copy(SymbolTable other) {
 		this.parent_scope = other.parent_scope;
 		this.scope_name = other.scope_name;
@@ -97,7 +156,7 @@ public class SymbolTable {
 		String table_rep = "SCOPE: " + scope_name + " [ID: " + mId + "]\n";
 		String sub_table_rep = "";
 		for(Entry e : entries) {
-			table_rep += "(" + e.address + ")[" + e.name + ", " + e.kind + ", " + e.type + ", " + dimensionStr(e) + ", " + (e.scope == null ? "NO" : e.scope.getId()) + "]\n";
+			table_rep += "(" + e.address + ")[" + e.name + ", " + e.kind + ", " + e.type + ", " + (e.defined ? "Defined" : "Undefined") + dimensionStr(e) + ", " + (e.scope == null ? "NO" : e.scope.getId()) + "]\n";
 			if(e.scope != null) {
 				sub_table_rep += "\n" + e.scope.toString();
 			}
@@ -106,7 +165,7 @@ public class SymbolTable {
 		return table_rep + sub_table_rep;		
 	}
 	
-	public String dimensionStr(Entry e) {
+	private String dimensionStr(Entry e) {
 		String str = "";
 		for(int i : e.array_sizes) {
 			str += "[" + i + "]";
@@ -122,6 +181,8 @@ public class SymbolTable {
 		int dimension;
 		ArrayList<Integer> array_sizes;
 		SymbolTable scope;
+		boolean defined;
+		ArrayList<Entry> params;
 		
 		int address;
 		
@@ -131,7 +192,9 @@ public class SymbolTable {
 			this.type = type;
 			this.dimension = dimension;
 			this.array_sizes = array_sizes == null ? new ArrayList<>() : array_sizes;
-			address = next_address++;
+			this.address = next_address++;
+			this.defined = false;
+			this.params = new ArrayList<>();
 		}
 		
 		public SymbolTable getScope() {
