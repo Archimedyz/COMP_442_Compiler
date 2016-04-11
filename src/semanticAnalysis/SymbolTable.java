@@ -136,6 +136,13 @@ public class SymbolTable {
 	}
 	
 	/*
+	 * Return all entries for this symbol table
+	 */
+	public ArrayList<Entry> getEntries() {
+		return entries;
+	}
+	
+	/*
 	 * Return the Symbol Table ID.
 	 */
 	public int getId() {
@@ -189,14 +196,14 @@ public class SymbolTable {
 	
 	public class Entry {
 		
-		String name;
-		String kind;
-		String type;
-		int dimension;
-		ArrayList<Integer> array_sizes;
-		SymbolTable scope;
-		boolean defined;
-		ArrayList<Entry> params;
+		public String name;
+		public String kind;
+		public String type;
+		public int dimension;
+		public ArrayList<Integer> array_sizes;
+		public SymbolTable scope;
+		public boolean defined;
+		public ArrayList<Entry> params;
 		
 		int address;
 		
@@ -209,12 +216,6 @@ public class SymbolTable {
 			this.address = next_address++;
 			this.defined = false;
 			this.params = new ArrayList<>();
-		}
-		
-		public SymbolTable getScope() {
-			return scope;
-		}
-		
+		}		
 	}
-	
 }

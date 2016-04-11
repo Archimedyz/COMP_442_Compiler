@@ -1,20 +1,3 @@
 SCOPE: global [ID: 1]
-(0)[A, class, A, Defined, 2]
-(8)[aref, variable, A, Defined, NO]
-(9)[x, variable, int, Defined, NO]
-(10)[y, variable, float, Defined, NO]
-(11)[a, variable, int[10][10][10], Defined, NO]
-(12)[b, variable, int[10][5], Defined, NO]
-
-SCOPE: A [ID: 2]
-(1)[foo, function, int, Defined, 3]
-(3)[foo, function, float, Defined, 4]
-
-SCOPE: foo [ID: 3]
-(2)[a, parameter, int, Defined, NO]
-
-SCOPE: foo [ID: 4]
-(4)[b, parameter, int, Defined, NO]
-(5)[c, parameter, float, Defined, NO]
-(6)[d, parameter, float, Defined, NO]
-(7)[a, parameter, int, Defined, NO]
+(0)[x, variable, int, Defined, NO]
+(1)[i, variable, int, Defined, NO]

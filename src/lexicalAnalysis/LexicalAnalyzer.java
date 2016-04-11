@@ -6,8 +6,6 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintWriter;
 
-import core.DFA;
-
 public class LexicalAnalyzer {
 	
 	private BufferedReader src_file;

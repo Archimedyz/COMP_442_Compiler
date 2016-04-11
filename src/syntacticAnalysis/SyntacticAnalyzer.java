@@ -7,7 +7,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
-import core.ParseTree;
+import codeGeneration.CodeGenerator;
+import codeGeneration.ExpressionTree;
 import lexicalAnalysis.LexToken;
 import lexicalAnalysis.LexicalAnalyzer;
 import semanticAnalysis.SemanticAnalyzer;
@@ -18,6 +19,7 @@ public class SyntacticAnalyzer {
 
 	private LexicalAnalyzer lexical_analyzer;
 	private SemanticAnalyzer semantic_analyzer;
+	private CodeGenerator code_generator;
 	
 	private LexToken lookahead;
 	
@@ -40,6 +42,8 @@ public class SyntacticAnalyzer {
 		// the lexical analyzer
 		lexical_analyzer = new LexicalAnalyzer();
 		semantic_analyzer = new SemanticAnalyzer();
+		code_generator = new CodeGenerator();
+		code_generator.setGlobalTable(semantic_analyzer.getCurrentScope());
 		
 		try {
 			syn_out = new PrintWriter("log/out/syn_out.txt");
@@ -100,6 +104,9 @@ public class SyntacticAnalyzer {
 		// also open the semantic analysis out files
 		semantic_analyzer.openSource();
 		
+		// also open the code generation out files
+		code_generator.openSource();
+		
 		fileOpen = true;
 		return true;
 	}
@@ -107,6 +114,7 @@ public class SyntacticAnalyzer {
 	public void finalize() {
 		lexical_analyzer.finalize();
 		semantic_analyzer.finalize();
+		code_generator.finalize();
 		syn_out.close();
 		syn_err.close();
 	}
@@ -208,13 +216,7 @@ public class SyntacticAnalyzer {
 			}
 		}
 		return true;
-	}
-	
-	// Semantic Functions - BEGIN
-	
-	
-	// Semantic Functions - END
-	
+	}	
 	
 	// PRODUCTIONS - BEGIN
 	private boolean prog() {
@@ -326,7 +328,7 @@ public class SyntacticAnalyzer {
 		parseDown();
 		
 		if(("_ID _FLOAT _INT _PROGRAM").contains(lookahead.token_name)) {
-			if(funcDef() && match("_PROGRAM") && funcBody() && match("_SCOLON")) {
+			if(funcDef() && match("_PROGRAM") && code_generator.progBody() && funcBody() && match("_SCOLON")) {
 				print("<progBody> ::= <funcDef> program <funcBody> ;");
 				parseUp();
 				return true;
@@ -415,7 +417,7 @@ public class SyntacticAnalyzer {
 		parseDown();
 		
 		if(("_FOR _IF _GET _PUT _RETURN").contains(lookahead.token_name)) {
-			if(statementRes() && mStatement()) {
+			if(code_generator.finalizeDeclarations() && statementRes() && mStatement()) {
 				print("<varThenStat> ::= <statementRes> <mStatement>");
 				parseUp();
 				return true;
@@ -450,6 +452,8 @@ public class SyntacticAnalyzer {
 		TypeRef right_type = new TypeRef();
 		TypeRef name = new TypeRef();
 		
+		ExpressionTree et = new ExpressionTree();
+		
 		// add the node for this production.
 		parseDown();
 		
@@ -462,7 +466,7 @@ public class SyntacticAnalyzer {
 		} else if(("_LSB _DOT _EQUAL").contains(lookahead.token_name)) {
 			name = type;
 			type = new TypeRef();
-			if (semantic_analyzer.variableCheck(name) && semantic_analyzer.getType(name, type) && indice(name, type) && idnest(type) && assignOp() && expr(right_type) && match("_SCOLON") && semantic_analyzer.typeMatch(type, right_type) && mStatement()) {
+			if (code_generator.finalizeDeclarations() && semantic_analyzer.variableCheck(name) && semantic_analyzer.getType(name, type) && indice(name, type) && idnest(type) && assignOp() && expr(right_type, et) && match("_SCOLON") && code_generator.addAssignment(name.val, et) && semantic_analyzer.typeMatch(type, right_type) && mStatement()) {
 				print("<varOrStat> ::= <indice> <idnest> <assignOp> <expr> ; <mStatement>");
 				parseUp();
 				return true;
@@ -531,35 +535,47 @@ public class SyntacticAnalyzer {
 		TypeRef right_type = new TypeRef();
 		TypeRef name = new TypeRef();
 		
+		ExpressionTree et = new ExpressionTree();
+		ExpressionTree et2 = new ExpressionTree();
+		
 		// add the node for this production.
 		parseDown();
 				
 		if(("_RETURN").contains(lookahead.token_name)) {
-			if(match("_RETURN") && match("_LP") && expr(type) && match("_RP") && match("_SCOLON") && semantic_analyzer.checkReturnType(type)) {
+			if(match("_RETURN") && match("_LP") && expr(type, et) && match("_RP") && match("_SCOLON") && semantic_analyzer.checkReturnType(type)) {
 				print("<statementRes> ::= return ( <expr> ) ;");
 				parseUp();
 				return true;
 			} 
 		} else if(("_PUT").contains(lookahead.token_name)) {
-			if (match("_PUT") && match("_LP") && expr(type) && match("_RP") && match("_SCOLON")) {
+			if (match("_PUT") && match("_LP") && expr(type, et) && match("_RP") && match("_SCOLON")) {
 				print("<statementRes> ::= put ( <expr> ) ;");
+				code_generator.addPut(et);
 				parseUp();
 				return true;
 			} 
 		} else if(("_GET").contains(lookahead.token_name)) {
-			if (match("_GET") && match("_LP") && variable(type) && match("_RP") && match("_SCOLON")) {
-				print("<statementRes> ::= get ( <expr> ) ;");
+			if (match("_GET") && match("_LP") && variable(name, type, et) && match("_RP") && match("_SCOLON")) {
+				print("<statementRes> ::= get ( <variable> ) ;");
+				code_generator.addGet(name.val);
 				parseUp();
 				return true;
 			} 
 		} else if(("_IF").contains(lookahead.token_name)) {
-			if (match("_IF") && match("_LP") && expr(type) && semantic_analyzer.typeMatch(type, int_type) && match("_RP") && match("_THEN") && statBlock() && match("_ELSE") && statBlock() && match("_SCOLON")) {
+			TypeRef else_name = new TypeRef();
+			TypeRef endif_name = new TypeRef();
+			if (match("_IF") && match("_LP") && expr(type, et) && code_generator.beginIf(et, else_name, endif_name) && semantic_analyzer.typeMatch(type, int_type) && match("_RP") && match("_THEN") && statBlock() && code_generator.endIf(endif_name) && match("_ELSE") && code_generator.beginElse(else_name) && statBlock() && code_generator.endElse(endif_name) && match("_SCOLON")) {
 				print("<statementRes> ::= if ( <expr> ) then <statblock> else <statblock> ;");
 				parseUp();
 				return true;
 			} 
 		} else if(("_FOR").contains(lookahead.token_name)) {
-			if (match("_FOR") && match("_LP") && type(type) && match("_ID", name) && semantic_analyzer.addEntry(name.val, "variable", type) && semantic_analyzer.finalizeEntry(name.val, "variable") && assignOp() && expr(right_type) && match("_SCOLON") && semantic_analyzer.typeMatch(type, right_type) && relExpr() && match("_SCOLON") && assignStat() && match("_RP") && statBlock() && match("_SCOLON")) {
+			TypeRef forbody_name = new TypeRef();
+			TypeRef forend_name = new TypeRef();
+			TypeRef forcond_name = new TypeRef();
+			TypeRef forinc_name = new TypeRef();
+			
+			if (match("_FOR") && match("_LP") && type(type) && match("_ID", name) && semantic_analyzer.addEntry(name.val, "variable", type) && semantic_analyzer.finalizeEntry(name.val, "variable") && assignOp() && expr(right_type, et) && code_generator.addVarDecl(name.val, type.val) && code_generator.addAssignment(name.val, et) && match("_SCOLON") && code_generator.beginFor(forbody_name, forend_name, forcond_name, forinc_name) && semantic_analyzer.typeMatch(type, right_type) && relExpr(et2) && match("_SCOLON") && code_generator.addForCondition(et2, forbody_name, forend_name, forinc_name) && assignStat() && code_generator.endForInc(forbody_name, forcond_name) && match("_RP") && statBlock() && match("_SCOLON") && code_generator.endFor(forinc_name, forend_name)) {
 				print("<statementRes> ::= for ( <type> id <assignOp> <expr> ; relExpr ; assignStat ) statBlock ;");
 				parseUp();
 				return true;
@@ -600,14 +616,19 @@ public class SyntacticAnalyzer {
 		}
 		
 		TypeRef type1 = new TypeRef();
+		TypeRef name = new TypeRef();
 		TypeRef type2 = new TypeRef();
+		
+		ExpressionTree l_et = new ExpressionTree();
+		ExpressionTree r_et = new ExpressionTree();
 		
 		// add the node for this production.
 		parseDown();
 		
 		if(("_ID").contains(lookahead.token_name)) {
-			if(variable(type1) && assignOp() && expr(type2) && semantic_analyzer.typeMatch(type1, type2)) {
+			if(variable(name, type1, l_et) && assignOp() && expr(type2, r_et) && semantic_analyzer.typeMatch(type1, type2)) {
 				print("<assignStat> ::= <variable> <assingOp> <expr>");
+				code_generator.addAssignment(name.val, r_et);
 				parseUp();
 				return true;
 			}
@@ -646,7 +667,7 @@ public class SyntacticAnalyzer {
 		return false;
 	}
 
-	private boolean expr(TypeRef type) {
+	private boolean expr(TypeRef type, ExpressionTree et) {
 		// skip errors
 		if(!skipErrors("expr")) {
 			return false;
@@ -656,7 +677,7 @@ public class SyntacticAnalyzer {
 		parseDown();
 				
 		if(("_LP _NOT _ID _FNUM _INUM _ADDOP").contains(lookahead.token_name)) {
-			if(arithExpr(type) && relExprPart(type)) {
+			if(arithExpr(type, et) && relExprPart(type, et)) {
 				print("<expr> ::= <arithExpr> <relExprPart>");
 				parseUp();
 				return true;
@@ -666,20 +687,22 @@ public class SyntacticAnalyzer {
 		return false;
 	}
 
-	private boolean relExprPart(TypeRef left_type) {
+	private boolean relExprPart(TypeRef left_type, ExpressionTree et) {
 		// skip errors
 		if(!skipErrors("relExprPart")) {
 			return false;
 		}
 		
 		TypeRef right_type = new TypeRef();
+		ExpressionTree r_et = new ExpressionTree();
 		
 		// add the node for this production.
 		parseDown();
 		
 		if(("_LT _GT _RELOP").contains(lookahead.token_name)) {
-			if(relOp() && arithExpr(right_type) && semantic_analyzer.typeMatch(left_type, right_type)) {
+			if(relOp(et) && arithExpr(right_type, r_et) && semantic_analyzer.typeMatch(left_type, right_type)) {
 				print("<relExprPart> ::= <relOp> <arithExpr>");
+				et.addRChild(r_et);
 				if(!right_type.val.equals("_typeerror_")) {
 					left_type.val = "int"; // convert the relation to int for boolean.
 				}
@@ -695,7 +718,7 @@ public class SyntacticAnalyzer {
 		return false;
 	}
 	
-	private boolean relExpr() {
+	private boolean relExpr(ExpressionTree et) {
 		// skip errors
 		if(!skipErrors("relExpr")) {
 			return false;
@@ -704,12 +727,15 @@ public class SyntacticAnalyzer {
 		TypeRef left_type = new TypeRef();
 		TypeRef right_type = new TypeRef();
 		
+		ExpressionTree r_et = new ExpressionTree();
+		
 		// add the node for this production.
 		parseDown();
 		
 		if(("_LP _NOT _ID _FNUM _INUM _ADDOP").contains(lookahead.token_name)) {
-			if(arithExpr(left_type) && relOp() && arithExpr(right_type) && semantic_analyzer.typeMatch(left_type, right_type)) {
+			if(arithExpr(left_type, et) && relOp(et) && arithExpr(right_type, r_et) && semantic_analyzer.typeMatch(left_type, right_type)) {
 				print("<relExpr> ::= <arithExpr> <relOp> <arithExpr>");
+				et.addRChild(r_et);
 				parseUp();
 				return true;
 			}
@@ -718,7 +744,7 @@ public class SyntacticAnalyzer {
 		return false;
 	}
 
-	private boolean arithExpr(TypeRef type) {
+	private boolean arithExpr(TypeRef type, ExpressionTree et) {
 		// skip errors
 		if(!skipErrors("arithExpr")) {
 			return false;
@@ -728,7 +754,7 @@ public class SyntacticAnalyzer {
 		parseDown();
 				
 		if(("_LP _NOT _ID _FNUM _INUM _ADDOP").contains(lookahead.token_name)) {
-			if(term(type) && arithExprTail(type)) {
+			if(term(type, et) && arithExprTail(type, et)) {
 				print("<arithExpr> ::= <term> <arithExprTail>");
 				parseUp();
 				return true;
@@ -738,20 +764,22 @@ public class SyntacticAnalyzer {
 		return false;
 	}
 
-	private boolean arithExprTail(TypeRef type) {
+	private boolean arithExprTail(TypeRef type, ExpressionTree et) {
 		// skip errors
 		if(!skipErrors("arithExprTail")) {
 			return false;
 		}
 		
 		TypeRef right_type = new TypeRef();
+		ExpressionTree r_et = new ExpressionTree();
 		
 		// add the node for this production.
 		parseDown();
 		
 		if(("_ADDOP _OR").contains(lookahead.token_name)) {
-			if(addOp() && term(right_type) && arithExprTail(right_type) && semantic_analyzer.typeMatch(type, right_type)) {
+			if(addOp(et) && term(right_type, r_et) && arithExprTail(right_type, r_et) && semantic_analyzer.typeMatch(type, right_type)) {
 				print("<arithExprTail> ::= <addOp> <term> <arithExprTail>");
+				et.addRChild(r_et);
 				parseUp();
 				return true;
 			}
@@ -764,7 +792,7 @@ public class SyntacticAnalyzer {
 		return false;
 	}
 	
-	private boolean sign() {
+	private boolean sign(ExpressionTree et) {
 		// skip errors
 		if(!skipErrors("sign")) {
 			return false;
@@ -778,6 +806,7 @@ public class SyntacticAnalyzer {
 		if(("_ADDOP").contains(lookahead.token_name)) {
 			String lex = lookahead.lexeme;
 			if(match("_ADDOP")) {
+				et.pushRoot(lex, true, false, false);
 				print("<sign> ::= " + lex);
 				parseUp();
 				return true;
@@ -787,7 +816,7 @@ public class SyntacticAnalyzer {
 		return false;
 	}
 
-	private boolean term(TypeRef type) {
+	private boolean term(TypeRef type, ExpressionTree et) {
 		// skip errors
 		if(!skipErrors("term")) {
 			return false;
@@ -797,7 +826,7 @@ public class SyntacticAnalyzer {
 		parseDown();
 		
 		if(("_LP _NOT _ID _FNUM _INUM _ADDOP").contains(lookahead.token_name)) {
-			if(factor(type) && termTail(type)) {
+			if(factor(type, et) && termTail(type, et)) {
 				print("<term> ::= <factor> <termTail>");
 				parseUp();
 				return true;
@@ -807,20 +836,22 @@ public class SyntacticAnalyzer {
 		return false;
 	}
 
-	private boolean termTail(TypeRef type) {
+	private boolean termTail(TypeRef type, ExpressionTree et) {
 		// skip errors
 		if(!skipErrors("termTail")) {
 			return false;
 		}
 		
 		TypeRef right_type = new TypeRef();
+		ExpressionTree r_et = new ExpressionTree();
 		
 		// add the node for this production.
 		parseDown();
 		
 		if(("_MULTOP _AND").contains(lookahead.token_name)) {
-			if(multOp() && factor(right_type) && termTail(right_type) && semantic_analyzer.typeMatch(type, right_type)) {
+			if(multOp(et) && factor(right_type, r_et) && termTail(right_type, r_et) && semantic_analyzer.typeMatch(type, right_type)) {
 				print("<termTail> ::= <multOp> <factor> <termTail>");
+				et.addRChild(r_et);
 				parseUp();
 				return true;
 			}
@@ -833,41 +864,46 @@ public class SyntacticAnalyzer {
 		return false;
 	}
 
-	private boolean factor(TypeRef type) {
+	private boolean factor(TypeRef type, ExpressionTree et) {
 		// skip errors
 		if(!skipErrors("factor")) {
 			return false;
 		}
 		
+		ExpressionTree r_et = new ExpressionTree();
+		
 		// add the node for this production.
 		parseDown();
 		
 		if(("_ADDOP").contains(lookahead.token_name)) {
-			if(sign() && factor(type)) {
+			if(sign(et) && factor(type, r_et)) {
 				print("<factor> ::= <sign> <factor>");
+				et.addRChild(r_et);
 				parseUp();
 				return true;
 			} 
 		} else if(("_FNUM _INUM").contains(lookahead.token_name)) {
-			if (num(type)) {
+			if (num(type, et)) {
 				print("<factor> ::= <num>");
 				parseUp();
 				return true;
 			}
 		} else if(("_ID").contains(lookahead.token_name)) {
-			if (varOrFuncCall(type, semantic_analyzer.getCurrentScope())) {
+			if (varOrFuncCall(type, semantic_analyzer.getCurrentScope(), et)) {
 				print("<factor> ::= <varOrFuncCall>");
 				parseUp();
 				return true;
 			}
 		} else if(("_NOT").contains(lookahead.token_name)) {
-			if (match("_NOT") && factor(type) && semantic_analyzer.typeMatch(type, int_type)) {
+			if (match("_NOT") && factor(type, r_et) && semantic_analyzer.typeMatch(type, int_type)) {
 				print("<factor> ::= not <factor>");
+				et.pushRoot("not", true, false, false);
+				et.addRChild(r_et);
 				parseUp();
 				return true;
 			} 
 		} else if(("_LP").contains(lookahead.token_name)) {
-			if (match("_LP") && arithExpr(type) && match("_RP")) {
+			if (match("_LP") && arithExpr(type, et) && match("_RP")) {
 				print("<factor> ::= ( <arithExpr> )");
 				parseUp();
 				return true;
@@ -877,7 +913,7 @@ public class SyntacticAnalyzer {
 		return false;
 	}
 
-	private boolean varOrFuncCall(TypeRef type, SymbolTable scope) {
+	private boolean varOrFuncCall(TypeRef type, SymbolTable scope, ExpressionTree et) {
 		// skip errors
 		if(!skipErrors("varOrFuncCall")) {
 			return false;
@@ -892,8 +928,9 @@ public class SyntacticAnalyzer {
 		parseDown();		
 		
 		if(("_ID").contains(lookahead.token_name)) {
-			if(match("_ID", name) && semantic_analyzer.getType(name, type, new_scope) && varOrFuncCallTail(name, type, new_scope)) {
+			if(match("_ID", name) && semantic_analyzer.getType(name, type, new_scope) && varOrFuncCallTail(name, type, new_scope, et)) {
 				print("<varOrFuncCall> ::= id <varOrFuncCallTail>");
+				et.pushRoot(name.val, false, false, true);
 				parseUp();
 				return true;
 			}
@@ -902,7 +939,7 @@ public class SyntacticAnalyzer {
 		return false;
 	}
 	
-	private boolean varOrFuncCallTail(TypeRef name, TypeRef type, SymbolTable scope) {
+	private boolean varOrFuncCallTail(TypeRef name, TypeRef type, SymbolTable scope, ExpressionTree et) {
 		// skip errors
 		if(!skipErrors("varOrFuncCallTail")) {
 			return false;
@@ -912,13 +949,15 @@ public class SyntacticAnalyzer {
 		parseDown();
 				
 		if(("_LSB _DOT").contains(lookahead.token_name)) {
-			if(indice(name, type) && varOrFuncCallTailTail(type, scope)) {
+			// TODO: proper handling of indices and further processing of IDs.
+			if(indice(name, type) && varOrFuncCallTailTail(type, scope, et)) {
 				print("<varOrFuncCallTail> ::= <indice> <varOrFuncCallTailTail>");
 				parseUp();
 				return true;
 			} 
 		} else if(("_LP").contains(lookahead.token_name)) {
 			ArrayList<TypeRef> argList = new ArrayList<>();
+			// TODO: ExpressionTree for function calls
 			if (match("_LP") && aParams(argList) && match("_RP") && semantic_analyzer.functionCheck(name, scope, argList, type)) {
 				print("<varOrFuncCallTail> ::= ( <aParams> )");
 				parseUp();
@@ -933,7 +972,7 @@ public class SyntacticAnalyzer {
 		return false;
 	}
 	
-	private boolean varOrFuncCallTailTail(TypeRef type, SymbolTable scope) {
+	private boolean varOrFuncCallTailTail(TypeRef type, SymbolTable scope, ExpressionTree et) {
 		// skip errors
 		if(!skipErrors("varOrFuncCallTailTail")) {
 			return false;
@@ -943,7 +982,8 @@ public class SyntacticAnalyzer {
 		parseDown();
 		
 		if(("_DOT").contains(lookahead.token_name)) {
-			if(match("_DOT") && semantic_analyzer.updateScope(type, scope) && varOrFuncCall(type, scope)) {
+			// TODO Expression tree for nested IDs
+			if(match("_DOT") && semantic_analyzer.updateScope(type, scope) && varOrFuncCall(type, scope, et)) {
 				print("<varOrFuncCallTailTail> ::= . <varOrFuncCall>");
 				parseUp();
 				return true;
@@ -957,20 +997,20 @@ public class SyntacticAnalyzer {
 		return false;
 	}
 
-	private boolean variable(TypeRef type) {
+	private boolean variable(TypeRef name, TypeRef type, ExpressionTree et) {
 		// skip errors
 		if(!skipErrors("variable")) {
 			return false;
 		}
-		
-		TypeRef name = new TypeRef();
-		
+				
 		// add the node for this production.
 		parseDown();
 				
 		if(("_ID").contains(lookahead.token_name)) {
+			// TODO: handle indices and nested IDs
 			if(match("_ID", name) && semantic_analyzer.variableCheck(name) && semantic_analyzer.getType(name, type) && indice(name, type) && idnest(type)) {
 				print("<variable> ::= id <indice> <idnest>");
+				et.pushRoot(name.val, false, false, true);
 				parseUp();
 				return true;
 			}
@@ -1012,12 +1052,13 @@ public class SyntacticAnalyzer {
 		}
 		
 		TypeRef index_type = new TypeRef();
+		ExpressionTree et = new ExpressionTree();
 		
 		// add the node for this production.
 		parseDown();
 		
 		if(("_LSB").contains(lookahead.token_name)) {
-			if(semantic_analyzer.indexVar(name, type) && match("_LSB") && arithExpr(index_type) && semantic_analyzer.typeMatch(index_type, int_type) && match("_RSB") && indice(name, type)) {
+			if(semantic_analyzer.indexVar(name, type) && match("_LSB") && arithExpr(index_type, et) && semantic_analyzer.typeMatch(index_type, int_type) && match("_RSB") && indice(name, type)) {
 				print("<indice> ::= [ <arithExpr> ] <indice>");
 				parseUp();
 				return true;
@@ -1145,12 +1186,13 @@ public class SyntacticAnalyzer {
 		}
 		
 		TypeRef type = new TypeRef();
-		
+		ExpressionTree et = new ExpressionTree();
+
 		// add the node for this production.
 		parseDown();
 				
 		if(("_LP _NOT _ID _FNUM _INUM _ADDOP").contains(lookahead.token_name)) {
-			if(expr(type) && argsList.add(type) && aParamsTail(argsList)) {
+			if(expr(type, et) && argsList.add(type) && aParamsTail(argsList)) {
 				print("<aParams> ::= <expr> <aParamsTail>");
 				parseUp();
 				return true;
@@ -1198,12 +1240,13 @@ public class SyntacticAnalyzer {
 		}
 		
 		TypeRef type = new TypeRef();
+		ExpressionTree et = new ExpressionTree();
 		
 		// add the node for this production.
 		parseDown();
 		
 		if(("_COMMA").contains(lookahead.token_name)) {
-			if(match("_COMMA") && expr(type) && argsList.add(type) && aParamsTail(argsList)) {
+			if(match("_COMMA") && expr(type, et) && argsList.add(type) && aParamsTail(argsList)) {
 				print("<aParamsTail> ::= , <expr> <aParamsTail>");
 				parseUp();
 				return true;
@@ -1237,7 +1280,7 @@ public class SyntacticAnalyzer {
 		return false;
 	}
 
-	private boolean relOp() {
+	private boolean relOp(ExpressionTree et) {
 		// skip errors
 		if(!skipErrors("relOp")) {
 			return false;
@@ -1250,18 +1293,21 @@ public class SyntacticAnalyzer {
 			String lex = lookahead.lexeme;
 			if(match("_RELOP")) {
 				print("<relOp> ::= " + lex);
+				et.pushRoot(lex, true, false, false);
 				parseUp();
 				return true;
 			} 
 		} else if(("_GT").contains(lookahead.token_name)) {
 			if (match("_GT")) {
 				print("<relOp> ::= >");
+				et.pushRoot(">", true, false, false);
 				parseUp();
 				return true;
 			} 
 		} else if(("_LT").contains(lookahead.token_name)) {
 			if (match("_LT")) {
 				print("<relOp> ::= <");
+				et.pushRoot("<", true, false, false);
 				parseUp();
 				return true;
 			} 
@@ -1270,7 +1316,7 @@ public class SyntacticAnalyzer {
 		return false;
 	}
 
-	private boolean addOp() {
+	private boolean addOp(ExpressionTree et) {
 		// skip errors
 		if(!skipErrors("addOp")) {
 			return false;
@@ -1282,6 +1328,7 @@ public class SyntacticAnalyzer {
 		if(("_OR").contains(lookahead.token_name)) {
 			if(match("_OR")) {
 				print("<addOp> ::= or");
+				et.pushRoot("or", true, false, false);
 				parseUp();
 				return true;
 			} 
@@ -1289,6 +1336,7 @@ public class SyntacticAnalyzer {
 			String lex = lookahead.lexeme;
 			if (match("_ADDOP")) {
 				print("<addOp> ::= " + lex);
+				et.pushRoot(lex, true, false, false);
 				parseUp();
 				return true;
 			}
@@ -1297,7 +1345,7 @@ public class SyntacticAnalyzer {
 		return false;
 	}
 
-	private boolean multOp() {
+	private boolean multOp(ExpressionTree et) {
 		// skip errors
 		if(!skipErrors("multOp")) {
 			return false;
@@ -1308,6 +1356,7 @@ public class SyntacticAnalyzer {
 				
 		if(("_AND").contains(lookahead.token_name)) {
 			if(match("_AND")) {
+				et.pushRoot("and", true, false, false);
 				print("<multOp> ::= and");
 				parseUp();
 				return true;
@@ -1316,6 +1365,7 @@ public class SyntacticAnalyzer {
 			String lex = lookahead.lexeme;
 			if (match("_MULTOP")) {
 				print("<multOp> ::= " + lex);
+				et.pushRoot(lex, true, false, false);
 				parseUp();
 				return true;
 			} 
@@ -1324,7 +1374,7 @@ public class SyntacticAnalyzer {
 		return false;
 	}	
 	
-	private boolean num(TypeRef type) {
+	private boolean num(TypeRef type, ExpressionTree et) {
 		// skip errors
 		if(!skipErrors("num")) {
 			return false;
@@ -1335,6 +1385,8 @@ public class SyntacticAnalyzer {
 				
 		if(("_INUM").contains(lookahead.token_name)) {
 			if(match("_INUM", type)) {
+				// before changing the number out, put it in the expression tree
+				et.pushRoot(type.val, false, true, false);
 				type.val = "int";
 				print("<num> ::= inum");
 				parseUp();
@@ -1342,6 +1394,8 @@ public class SyntacticAnalyzer {
 			} 
 		} else if(("_FNUM").contains(lookahead.token_name)) {
 			if (match("_FNUM", type)) {
+				// before changing the number out, put it in the expression tree
+				et.pushRoot(type.val, false, true, false);
 				type.val = "float";
 				print("<num> ::= fnum");
 				parseUp();

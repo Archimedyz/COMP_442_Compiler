@@ -1,4 +1,4 @@
-package core;
+package syntacticAnalysis;
 
 import java.util.ArrayList;
 

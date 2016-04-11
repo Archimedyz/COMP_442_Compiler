@@ -25,8 +25,7 @@ public class SemanticAnalyzer {
 	}
 	
 	public void openSource() {
-		sem_out.close();
-		sem_err.close();
+		finalize();
 		try {
 			sem_out = new PrintWriter("log/out/sem_out.txt");
 			sem_err = new PrintWriter("log/err/sem_err.txt");
@@ -60,7 +59,7 @@ public class SemanticAnalyzer {
 			name += " +"; // add a space and then symbol to the name so that matches for it cannot be found in the table, but also so that it is ignored entirely without affecting the compilation
 		}
 		// add the scope anyway for now.
-		SymbolTable next_scope = curr_scope.createEntry(name, kind, type.val, type.dimension, type.array_sizes).getScope();
+		SymbolTable next_scope = curr_scope.createEntry(name, kind, type.val, type.dimension, type.array_sizes).scope;
 		if(next_scope != null) { // if the added entry contains a scope, move into it.
 			curr_scope = next_scope;
 		}

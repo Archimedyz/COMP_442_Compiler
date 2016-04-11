@@ -1,3 +1,0 @@
-Semantic Error - (23:4): Type mismatch: cannot convert type 'int[10][5]' to type 'float'.
-Semantic Error - (24:4): Type mismatch: cannot convert type 'int[10][10][10]' to type 'int'.
-Semantic Error - (25:4): Type mismatch: cannot convert type 'int[10][5]' to type 'int[10][10][10]'.

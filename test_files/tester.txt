@@ -1,27 +1,11 @@
-class A {
-
-	int foo(int a) {
-	
-	};
-	
-	float foo(int b, float c, float d, int a) {
-	
-	};
-
-};
-
 program {
-	A aref;
 	int x;
-	float y;
-	int a[10][10][10];
-	int b[10][5];
 	
-	x = aref.foo(1);
-	y = aref.foo(1, 1.0, 1.0, 1);
+	get(x);
 	
-	y = b;
-	x = a;
-	a = b;
+	for (int i = 0; i < x; i = i + 1) {
+		put(i);
+	};
+	
 	
 };
