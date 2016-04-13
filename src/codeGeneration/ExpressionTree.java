@@ -10,20 +10,20 @@ public class ExpressionTree {
 		curr = null;
 	}
 	
-	public void pushRoot(String value, boolean isOperation, boolean isNumber, boolean isIdentifier) {
-		Node new_root = new Node(value, isOperation, isNumber, isIdentifier, null);
+	public void pushRoot(String value, NodeType nt) {
+		Node new_root = new Node(value, nt, null);
 		new_root.left = root;
 		root = new_root;
 		curr = root;
 	}
 	
-	public boolean addLChild(String value, boolean isOperation, boolean isNumber, boolean isIdentifier) {
-		curr.left = new Node(value, isOperation, isNumber, isIdentifier, curr);		
+	public boolean addLChild(String value, NodeType nt) {
+		curr.left = new Node(value, nt, curr);		
 		return true;
 	}
 	
-	public boolean addRChild(String value, boolean isOperation, boolean isNumber, boolean isIdentifier) {
-		curr.right = new Node(value, isOperation, isNumber, isIdentifier, curr);
+	public boolean addRChild(String value, NodeType nt) {
+		curr.right = new Node(value, nt, curr);
 		return true;
 	}
 	
@@ -81,21 +81,22 @@ public class ExpressionTree {
 		return root == null ? "" : root.toString();
 	}
 	
+	public enum NodeType {OPERATOR, FUNCTION, IDENTIFIER, VALUE};
+	
 	public class Node {
+				
 		public String value;
-		public boolean isOperation;
-		public boolean isNumber;
-		public boolean isIdentifier;
 		
-		public Node parent;
-		public Node left;
-		public Node right;
+		public NodeType node_type;
 		
-		public Node(String value, boolean isOperation, boolean isNumber, boolean isIdentifier, Node parent) {
+		Node parent;
+		Node left;
+		Node right;
+		
+		public Node(String value, NodeType node_type, Node parent) {
 			this.value = value;
-			this.isOperation = isOperation;
-			this.isNumber = isNumber;
-			this.isIdentifier = isIdentifier;
+			this.node_type = node_type;
+			this.parent = parent;
 		}	
 		
 		public String toString() {
