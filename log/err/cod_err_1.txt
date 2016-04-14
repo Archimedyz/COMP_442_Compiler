@@ -1,7 +1,0 @@
-Number Format Exception. Compiler cannot parse or strings. Found '3.0'.
-Number Format Exception. Compiler cannot parse or strings. Found '7.0006'.
-Number Format Exception. Compiler cannot parse or strings. Found '1.05'.
-Number Format Exception. Compiler cannot parse or strings. Found '2.04'.
-Number Format Exception. Compiler cannot parse or strings. Found '2.47'.
-Number Format Exception. Compiler cannot parse or strings. Found '3.0'.
-Number Format Exception. Compiler cannot parse or strings. Found '7.0006'.

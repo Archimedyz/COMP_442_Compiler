@@ -1,0 +1,35 @@
+/*
+
+	This file contains code gen for
+	> memory allocation (ints only)
+	> Conditional statement
+	> I/O
+	> arithmetic relational logical
+	> loops
+
+*/
+
+program {
+
+	int x;
+	int y;
+	
+	get(x);	
+	get(y);
+	
+	for(int i = 0; i < x; i = i + 1) {
+		for(int j = 0; j < y; j = j + 1) {
+			put(i * y + j);
+		};
+	};
+	
+	put(-1111);
+	
+	x = ((10 + 100) / 11 * 10) - 10;
+	y = (1 and 0) or (not 1);
+	
+	put(x);
+	put(y);
+	
+
+};

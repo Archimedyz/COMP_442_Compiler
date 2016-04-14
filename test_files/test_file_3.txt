@@ -1,47 +1,12 @@
-/*
-	This file will be an error free file, but will contain semantic structures that are checked.
-	No semantic errors should be produced after compilation.
-*/
-class A {
-	int id_a;
-	int val_a;
+class errGen {
+	int var1[4-][5][7][8][9][1][0];
+	float var2; +
 	
-	int true() {
-		return (1);
-	};
-};
-
-class B {
-	int id_b;
-	float val_b;
-	
-	int isA(A a_ref, int a_id) {
-		return (a_ref.true() and a_id);
-	};
-};
-
-float pi() {
-	return (3.14);
+	int foo() {
+		return(0);
+	}};
 };
 
 program {
-	// area of circle.
-	float r;
-	float area;
-	
-	// check A's id.
-	A a;
-	B b[1][1];
-	int id;
-	int is_true;
-	
-	// area of circle.
-	get(r);
-	area = r * r * pi();
-	put(area);
-	
-	// check A's id.
-	get(id);
-	is_true = b[0][0].isA(a, 1);
-	put(is_true);
+
 };

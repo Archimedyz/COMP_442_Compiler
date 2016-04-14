@@ -22,13 +22,9 @@ public class LexicalAnalyzer {
 	public LexicalAnalyzer() {
 		
 		src_file = null;
-		
-		try {
-			lex_out = new PrintWriter("log/out/lex_out.txt");
-			lex_err = new PrintWriter("log/err/lex_err.txt");
-		} catch (FileNotFoundException e) {
-			System.err.println("Cannot open log files. [lex]");
-		}
+	
+		lex_out = null;
+		lex_err = null;
 		
 		this.curr_line = 1;
 		this.curr_col = 0;
@@ -40,10 +36,14 @@ public class LexicalAnalyzer {
 		init();
 	}
 	
-	public boolean openSource(String src_file_path) {
+	public boolean openSource(String src_file_path, int out_num) {
+		
+		finalize();
 		
 		try {
 			src_file = new BufferedReader(new FileReader(src_file_path));
+			lex_out = new PrintWriter("log/out/lex_out_" + out_num + ".txt");
+			lex_err = new PrintWriter("log/err/lex_err_" + out_num + ".txt");
 		} catch(FileNotFoundException e) {
 			return false;
 		} catch(Exception e) {
@@ -59,8 +59,12 @@ public class LexicalAnalyzer {
 	}
 	
 	public void finalize() {
-		lex_out.close();
-		lex_err.close();
+		if(lex_out != null) {
+			lex_out.close();
+		}
+		if(lex_err != null) {
+			lex_err.close();
+		}
 	}
 	
 	public LexToken nextToken() throws IOException{

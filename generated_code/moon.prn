@@ -1,0 +1,17 @@
+MOON listing of cod_out.m.
+
+    1     0 % Variable Declaration: x
+    2     0 x	dw 0
+    3     4 % Variable Declaration: y
+    4     4 y	dw 0
+    5     8 % Variable Declaration: z
+    6     8 z	dw 0
+    7    12 	align
+    8    12 	entry
+    9    12 % Assignment: [x = (x * y) + z]
+   10    12 	lw	R1,x(R0)
+   11    16 	lw	R2,y(R0)
+   12    20 	mul	R2,R1,R2
+   13    24 	lw	R1,z(R0)
+   14    28 	add	R1,R2,R1
+   15    32 	sw	x(R0),R1

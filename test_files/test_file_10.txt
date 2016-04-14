@@ -1,0 +1,40 @@
+/*
+
+	This file contains code gen for
+	>  REST
+
+*/
+
+int foo() {
+
+	int a;
+	
+	get(a);
+	
+	return(a);
+
+};
+
+int bar(int b) {
+	
+	int a;
+	
+	a = b * foo();
+	
+	return(a);
+	
+};
+
+program {
+
+	int a;
+	
+	a = foo();
+	
+	put(a);
+	get(a);
+	
+	a = bar(a);
+	put(a);
+
+};

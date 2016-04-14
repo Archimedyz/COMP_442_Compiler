@@ -37,12 +37,8 @@ public class CodeGenerator {
 		
 		this.global_table = null;
 		
-		try {
-			cod_out = new CodeFileWriter("C://Users/Awais/Desktop/moon/cod_out.m");
-			cod_err = new PrintWriter("log/err/cod_err.txt");
-		} catch (FileNotFoundException e) {
-			System.err.println("Cannot open log files. [cod]");
-		}
+		cod_out = null;
+		cod_err = null;
 
 		this.next_if = 1;
 		this.next_for = 1;
@@ -64,7 +60,7 @@ public class CodeGenerator {
 		finalize();
 		
 		try {
-			cod_out = new CodeFileWriter("C://Users/Awais/Desktop/moon/cod_out_" + out_num + ".m");
+			cod_out = new CodeFileWriter("C:generated_code/cod_out_" + out_num + ".m");
 			cod_err = new PrintWriter("log/err/cod_err_" + out_num + ".txt");
 		} catch (FileNotFoundException e) {
 			success = false;
@@ -73,9 +69,13 @@ public class CodeGenerator {
 	}
 	
 	public void finalize() {
-		cod_out.print("\thlt\n", FileSection.PROGRAM);
-		cod_out.close();
-		cod_err.close();
+		if(cod_out != null) {
+			cod_out.print("\thlt\n", FileSection.PROGRAM);
+			cod_out.close();			
+		}
+		if(cod_err != null) {
+			cod_err.close();
+		}
 	}
 	
 	public void setGlobalTable(SymbolTable s) {
@@ -90,6 +90,7 @@ public class CodeGenerator {
 		// add some initial variables to the variable declarations.
 		cod_out.print("% Variable Declaration of program variables.\n", FileSection.DECLARATION);
 		cod_out.print("stack\tdw 0\n", FileSection.DECLARATION);
+		cod_out.print("return\tdw 0\n", FileSection.DECLARATION);
 		
 		// print the beginning parts for the program.
 		cod_out.print("\n\talign\n\tentry\n\n", FileSection.PROGRAM);		

@@ -48,13 +48,8 @@ public class SyntacticAnalyzer {
 		code_generator = new CodeGenerator();
 		code_generator.setGlobalTable(semantic_analyzer.getCurrentScope());
 		
-		try {
-			syn_out = new PrintWriter("log/out/syn_out.txt");
-			syn_err = new PrintWriter("log/err/syn_err.txt");
-		} catch (FileNotFoundException e) {
-			success = false;
-			System.err.println("Cannot open log files. [syn]");
-		}
+		syn_out = null;
+		syn_err = null;
 		
 		fileOpen = false;
 		lookahead = null;
@@ -93,8 +88,7 @@ public class SyntacticAnalyzer {
 	
 	public boolean openSource(String src_file_path, int out_num) {
 		
-		syn_out.close();
-		syn_err.close();
+		finalize();
 		try {
 			syn_out = new PrintWriter("log/out/syn_out_" + out_num + ".txt");
 			syn_err = new PrintWriter("log/err/syn_err_" + out_num + ".txt");
@@ -103,7 +97,7 @@ public class SyntacticAnalyzer {
 			System.err.println("Cannot open log files. [syn]");
 		}
 				
-		if(!lexical_analyzer.openSource(src_file_path)) {
+		if(!lexical_analyzer.openSource(src_file_path, out_num)) {
 			fileOpen = false;
 			return false;
 		}
@@ -122,8 +116,12 @@ public class SyntacticAnalyzer {
 		lexical_analyzer.finalize();
 		semantic_analyzer.finalize();
 		code_generator.finalize();
-		syn_out.close();
-		syn_err.close();
+		if(syn_out != null) {
+			syn_out.close();
+		}
+		if(syn_err != null) {
+			syn_err.close();
+		}
 	}
 	
 	private boolean match(String token_name, TypeRef ... ret) {

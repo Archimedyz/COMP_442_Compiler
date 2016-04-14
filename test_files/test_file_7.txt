@@ -1,0 +1,32 @@
+/*
+	This file will exhibit the following errors.
+	> undeclared class use.
+	> Return type mismatch.
+	> Array attribute (i.e. trying to scope into an array. e.g.  “int x[10];  int y; y = x.value;”).
+	> Undefined attributes and functions.
+	> Function parameter mismatch.
+*/
+
+class B {
+	A a_ref;
+	
+	float typeMismatch() {
+		int i[10][10];
+		i[0][0] = 100;
+		return (i[0][0]);
+	};
+};
+
+program {
+
+	int a[2];
+	B b_ref[2];
+	
+	a[1] = b_ref.typeMismatch();
+	a = mismatchType();
+	a[0] = b_ref.typeMismatch(10);
+	a[0] = b_ref.b_val;
+	get(a);
+	put(a);
+
+};

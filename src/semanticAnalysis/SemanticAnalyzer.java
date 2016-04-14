@@ -18,13 +18,8 @@ public class SemanticAnalyzer {
 	public SemanticAnalyzer() {
 		curr_scope = new SymbolTable("global");
 
-		try {
-			sem_out = new PrintWriter("log/out/sem_out.txt");
-			sem_err = new PrintWriter("log/err/sem_err.txt");
-		} catch (FileNotFoundException e) {
-			success = false;
-			System.err.println("Cannot open log files. [sem]");
-		}
+		sem_out = null;
+		sem_err = null;
 		
 		success = true;
 	}
@@ -41,8 +36,12 @@ public class SemanticAnalyzer {
 	}
 	
 	public void finalize(){
-		sem_out.close();
-		sem_err.close();
+		if(sem_out != null) {
+			sem_out.close();
+		}
+		if(sem_err != null) {
+			sem_err.close();
+		}
 	}	
 	
 	public void print() {

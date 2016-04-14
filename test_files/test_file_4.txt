@@ -1,0 +1,28 @@
+class A {
+
+	int val[10];
+	
+	int foo() {
+		return(10);
+	};
+};
+
+float bar() {
+	float y;
+	get(y);
+	return(y);
+};
+
+program {
+	A aref;
+		
+	if (1) then
+		if (1) then
+			put(1);
+		else
+			put(2);
+		; // need the semi colon to denote end of if
+	else
+		put(3);
+	; // need the semi colon to denote end of if
+};

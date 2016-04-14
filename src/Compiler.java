@@ -74,16 +74,17 @@ public class Compiler {
 		Compiler compiler = new Compiler();
 		
 		boolean exit = false;
+
+		Scanner keyin = new Scanner(System.in);
+		System.out.println("-----------------------------------------------------");
+		System.out.println("\tCOMP 442 - COMPILER");
+		System.out.println("-----------------------------------------------------");
+		System.out.println("Select a file number to run.");
+		System.out.println("You may either select a single value(#), or a range of values(#-#).");
+		System.out.println("To compile a custom file, specify the location using the command -c(i.e. '-c {file_path}').");
+		System.out.println("Type 'exit' to terminate the application.\n");
 		
 		while(exit == false) {
-			Scanner keyin = new Scanner(System.in);
-			System.out.println("-----------------------------------------------------");
-			System.out.println("\tCOMP 442 - COMPILER");
-			System.out.println("-----------------------------------------------------");
-			System.out.println("Select a file number to run.");
-			System.out.println("You may either select a single value(#), or a range of values(#-#).");
-			System.out.println("To compile a custom file, specify the location using the command -c(i.e. '-c {file_path}').");
-			System.out.println("Type 'exit' to terminate the application.\n");
 			System.out.print("> ");
 			
 			String res = keyin.next();
