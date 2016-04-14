@@ -1,0 +1,11 @@
+SCOPE: global [ID: 2]
+(0)[foo, function, int, Defined, 3]
+(2)[bar, function, int, Defined, 4]
+(5)[x, variable, int, Defined, NO]
+
+SCOPE: foo [ID: 3]
+(1)[x, variable, int, Defined, NO]
+
+SCOPE: bar [ID: 4]
+(3)[y, parameter, int, Defined, NO]
+(4)[x, variable, int, Defined, NO]

@@ -1,6 +1,0 @@
-SCOPE: global [ID: 1]
-(0)[foo, function, int, Defined, 2]
-(2)[a, variable, int, Defined, NO]
-
-SCOPE: foo [ID: 2]
-(1)[x, variable, int, Defined, NO]

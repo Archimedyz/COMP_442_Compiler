@@ -3,7 +3,17 @@ int foo() {
 
 	int x;
 	
-	x = 110;
+	get(x);
+	
+	return(x);
+
+};
+
+int bar(int y) {
+
+	int x;
+	
+	x = y * foo();
 	
 	return(x);
 
@@ -11,10 +21,12 @@ int foo() {
 
 program {
 	
-	int a;
+	int x;
 		
-	a = foo();	
+	x = foo();	
+	put(x);
 	
-	put(a);
+	x = bar(x);
+	put(x);
 	
 };

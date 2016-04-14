@@ -36,6 +36,8 @@ public class SyntacticAnalyzer {
 	
 	private TypeRef int_type;
 	
+	public static boolean success = true;
+	
 	// for error messages
 	private Map<String, String> tokenNameToExpectedString;
 	
@@ -50,6 +52,7 @@ public class SyntacticAnalyzer {
 			syn_out = new PrintWriter("log/out/syn_out.txt");
 			syn_err = new PrintWriter("log/err/syn_err.txt");
 		} catch (FileNotFoundException e) {
+			success = false;
 			System.err.println("Cannot open log files. [syn]");
 		}
 		
@@ -65,6 +68,8 @@ public class SyntacticAnalyzer {
 		int_type.val = "int";
 		
 		tokenNameToExpectedString = new HashMap<>();
+		
+		success = true;
 		
 		init();
 	}
@@ -86,14 +91,15 @@ public class SyntacticAnalyzer {
 		return false;
 	}
 	
-	public boolean openSource(String src_file_path) {
+	public boolean openSource(String src_file_path, int out_num) {
 		
 		syn_out.close();
 		syn_err.close();
 		try {
-			syn_out = new PrintWriter("log/out/syn_out.txt");
-			syn_err = new PrintWriter("log/err/syn_err.txt");
+			syn_out = new PrintWriter("log/out/syn_out_" + out_num + ".txt");
+			syn_err = new PrintWriter("log/err/syn_err_" + out_num + ".txt");
 		} catch (FileNotFoundException e) {
+			success = false;
 			System.err.println("Cannot open log files. [syn]");
 		}
 				
@@ -103,10 +109,10 @@ public class SyntacticAnalyzer {
 		}
 		
 		// also open the semantic analysis out files
-		semantic_analyzer.openSource();
+		semantic_analyzer.openSource(out_num);
 		
 		// also open the code generation out files
-		code_generator.openSource();
+		code_generator.openSource(out_num);
 		
 		fileOpen = true;
 		return true;
@@ -133,6 +139,7 @@ public class SyntacticAnalyzer {
 		}
 		
 		syn_err.println("Syntax Error - (" + lookahead.line + ":" + lookahead.col + "): expected " + tokenNameToExpectedString.get(token_name) + ", found '" + lookahead.lexeme + "'.");
+		success = false;
 		// keep going until the end of the line, or until a semicolon is reached. perhaps the token is close by
 		do {
 			lookahead = nextTokenAll();
@@ -209,6 +216,7 @@ public class SyntacticAnalyzer {
 		String follow = followSets.get(non_terminal);
 		if(!first.contains(lookahead.token_name) && !(first.contains("_EPSILON") && follow.contains(lookahead.token_name))) {
 			syn_err.println("Syntax Error - (" + lookahead.line + ":" + lookahead.col + "): Unexpected token '" + lookahead.lexeme + "'."); // nonTerminalSkipMsg(non_terminal));
+			success = false;
 			while(!first.contains(lookahead.token_name) && !follow.contains(lookahead.token_name)) {
 				lookahead = nextToken();
 				if(lookahead.token_name.equals("_EOF") || (!first.contains("_EPSILON") && follow.contains(lookahead.token_name))) {
@@ -951,7 +959,6 @@ public class SyntacticAnalyzer {
 		parseDown();
 				
 		if(("_LSB _DOT").contains(lookahead.token_name)) {
-			// TODO: proper handling of indices and further processing of IDs.
 			if(indice(name, type) && varOrFuncCallTailTail(type, scope, et)) {
 				print("<varOrFuncCallTail> ::= <indice> <varOrFuncCallTailTail>");
 				et.pushRoot(name.val, NodeType.IDENTIFIER);
@@ -960,10 +967,10 @@ public class SyntacticAnalyzer {
 			} 
 		} else if(("_LP").contains(lookahead.token_name)) {
 			ArrayList<TypeRef> argList = new ArrayList<>();
-			// TODO: ExpressionTree for function calls
-			if (match("_LP") && aParams(argList) && match("_RP") && semantic_analyzer.functionCheck(name, scope, argList, type)) {
+			ArrayList<ExpressionTree> argExpr = new ArrayList<>();
+			if (match("_LP") && aParams(argList, argExpr) && match("_RP") && semantic_analyzer.functionCheck(name, scope, argList, type)) {
 				print("<varOrFuncCallTail> ::= ( <aParams> )");
-				et.pushRoot(name.val, NodeType.FUNCTION);
+				et.pushRoot(name.val, NodeType.FUNCTION, argExpr);
 				parseUp();
 				return true;
 			} 
@@ -987,7 +994,6 @@ public class SyntacticAnalyzer {
 		parseDown();
 		
 		if(("_DOT").contains(lookahead.token_name)) {
-			// TODO Expression tree for nested IDs
 			if(match("_DOT") && semantic_analyzer.updateScope(type, scope) && varOrFuncCall(type, scope, et)) {
 				print("<varOrFuncCallTailTail> ::= . <varOrFuncCall>");
 				parseUp();
@@ -1012,7 +1018,6 @@ public class SyntacticAnalyzer {
 		parseDown();
 				
 		if(("_ID").contains(lookahead.token_name)) {
-			// TODO: handle indices and nested IDs
 			if(match("_ID", name) && semantic_analyzer.variableCheck(name) && semantic_analyzer.getType(name, type) && indice(name, type) && idnest(type)) {
 				print("<variable> ::= id <indice> <idnest>");
 				et.pushRoot(name.val, NodeType.IDENTIFIER);
@@ -1170,7 +1175,7 @@ public class SyntacticAnalyzer {
 		parseDown();
 		
 		if(("_ID _FLOAT _INT").contains(lookahead.token_name)) {
-			if(type(type) && match("_ID", name) && arraySize(type) && semantic_analyzer.addEntry(name.val, "parameter", type) && semantic_analyzer.finalizeEntry(name.val, "parameter") && fParamsTail()) {
+			if(type(type) && match("_ID", name) && arraySize(type) && semantic_analyzer.addEntry(name.val, "parameter", type) && semantic_analyzer.finalizeEntry(name.val, "parameter") && code_generator.addFuncParameter(name.val, type.val) && fParamsTail()) {
 				print("<fParams> ::= <type> id <arraySize> <fParamsTail>");
 				parseUp();
 				return true;
@@ -1184,7 +1189,7 @@ public class SyntacticAnalyzer {
 		return false;
 	}
 
-	private boolean aParams(ArrayList<TypeRef> argsList) {
+	private boolean aParams(ArrayList<TypeRef> argList, ArrayList<ExpressionTree> argExpr) {
 		// skip errors
 		if(!skipErrors("aParams")) {
 			return false;
@@ -1197,7 +1202,7 @@ public class SyntacticAnalyzer {
 		parseDown();
 				
 		if(("_LP _NOT _ID _FNUM _INUM _ADDOP").contains(lookahead.token_name)) {
-			if(expr(type, et) && argsList.add(type) && aParamsTail(argsList)) {
+			if(expr(type, et) && argList.add(type) && argExpr.add(et) && aParamsTail(argList, argExpr)) {
 				print("<aParams> ::= <expr> <aParamsTail>");
 				parseUp();
 				return true;
@@ -1238,7 +1243,7 @@ public class SyntacticAnalyzer {
 		return false;
 	}
 	
-	private boolean aParamsTail(ArrayList<TypeRef> argsList) {
+	private boolean aParamsTail(ArrayList<TypeRef> argList, ArrayList<ExpressionTree> argExpr) {
 		// skip errors
 		if(!skipErrors("aParamsTail")) {
 			return false;
@@ -1251,7 +1256,7 @@ public class SyntacticAnalyzer {
 		parseDown();
 		
 		if(("_COMMA").contains(lookahead.token_name)) {
-			if(match("_COMMA") && expr(type, et) && argsList.add(type) && aParamsTail(argsList)) {
+			if(match("_COMMA") && expr(type, et) && argList.add(type) && argExpr.add(et) && aParamsTail(argList, argExpr)) {
 				print("<aParamsTail> ::= , <expr> <aParamsTail>");
 				parseUp();
 				return true;

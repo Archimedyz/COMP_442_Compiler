@@ -32,7 +32,7 @@ public class CodeFileWriter {
 	}
 	
 	public void close() {
-		fout.print(declarations + "\n%%%\tPROGRAM START" + body + "\n%%%\tSUBROUNTINE START" + subroutines);
+		fout.print(declarations + "\n%%%\t\tPROGRAM START" + body + "\n%%%\t\tSUBROUNTINE START\n" + subroutines);
 		fout.close();
 	}
 	

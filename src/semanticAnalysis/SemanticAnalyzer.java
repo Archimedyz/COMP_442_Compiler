@@ -13,6 +13,8 @@ public class SemanticAnalyzer {
 	private PrintWriter sem_out;
 	private PrintWriter sem_err;
 	
+	public static boolean success = true;
+	
 	public SemanticAnalyzer() {
 		curr_scope = new SymbolTable("global");
 
@@ -20,16 +22,20 @@ public class SemanticAnalyzer {
 			sem_out = new PrintWriter("log/out/sem_out.txt");
 			sem_err = new PrintWriter("log/err/sem_err.txt");
 		} catch (FileNotFoundException e) {
+			success = false;
 			System.err.println("Cannot open log files. [sem]");
 		}
+		
+		success = true;
 	}
 	
-	public void openSource() {
+	public void openSource(int out_num) {
 		finalize();
 		try {
-			sem_out = new PrintWriter("log/out/sem_out.txt");
-			sem_err = new PrintWriter("log/err/sem_err.txt");
+			sem_out = new PrintWriter("log/out/sem_out_" + out_num + ".txt");
+			sem_err = new PrintWriter("log/err/sem_err_" + out_num + ".txt");
 		} catch (FileNotFoundException e) {
+			success = false;
 			System.err.println("Cannot open log files. [sem]");
 		}
 	}
@@ -56,6 +62,7 @@ public class SemanticAnalyzer {
 		// First determine if the addition is a function, and if it is, determine if it is valid overloading
 		if(!kind.equals("function") && curr_scope.search(name)) { // otherwise check for mutiple declaration
 			sem_err.println("Semantic Error - (" + type.line + ":" + type.col + "): Multiple declaration: '" + (type.val == null ? "" : (type.val + " ")) + name + "' (" + kind + ").");
+			success = false;
 			name += " +"; // add a space and then symbol to the name so that matches for it cannot be found in the table, but also so that it is ignored entirely without affecting the compilation
 		}
 		// add the scope anyway for now.
@@ -127,6 +134,7 @@ public class SemanticAnalyzer {
 		
 		// if the variable was not in the scope, we will be here, and can display an error
 		sem_err.println("Semantic Error - (" + name.line + ":" + name.col + "): Undefined variable: '" + name.val + "'.");
+		success = false;
 		
 		return true;
 	}
@@ -145,6 +153,7 @@ public class SemanticAnalyzer {
 		
 		// if the variable was not in the scope, we will be here, and can display an error
 		sem_err.println("Semantic Error - (" + name.line + ":" + name.col + "): Undefined class: '" + name.val + "'.");
+		success = false;
 		
 		return true;
 	}
@@ -161,6 +170,7 @@ public class SemanticAnalyzer {
 		
 		if(!t1.val.equals(t2.val) || (t1.dimension - t1.indices) != (t2.dimension - t2.indices)) {
 			sem_err.println("Semantic Error - (" + t1.line + ":" + t1.col + "): Type mismatch: cannot convert type '" + t2.toString() + "' to type '" + t1.toString() + "'.");
+			success = false;
 			// change the type of the latter to typeerror
 			t2.val = "_typeerror_";
 		}
@@ -191,6 +201,7 @@ public class SemanticAnalyzer {
 			++type.indices;	
 		} else {
 			sem_err.println("Semantic Error - (" + type.line + ":" + type.col + "): Dimension out of bounds. Identifier '" + name.val + "' has a dimension of " + type.dimension + ".");
+			success = false;
 		}
 		return true;
 	}
@@ -200,6 +211,7 @@ public class SemanticAnalyzer {
 		SymbolTable parent_scope = curr_scope.getParentScope();
 		if(parent_scope == null) {
 			sem_err.println("Parsing Error. Return in global scope.");
+			success = false;
 		}
 		
 		TypeRef return_type = new TypeRef();
@@ -207,6 +219,7 @@ public class SemanticAnalyzer {
 		
 		if(!return_type.val.equals(type.val)) {
 			sem_err.println("Semantic Error - (" + type.line + ":" + type.col + "): Function " + curr_scope.getScopeName() + ": return type must be '" + return_type.val + "'.");
+			success = false;
 		}
 		
 		return true;
@@ -218,6 +231,7 @@ public class SemanticAnalyzer {
 	public boolean getAttributeType(TypeRef type, TypeRef name, TypeRef attr_type) {
 		if(type.dimension - type.indices != 0) {
 			sem_err.println("Semantic Error - (" + name.line + ":" + name.col + "): Array type cannot have attribute.");
+			success = false;
 			return true;
 		}
 		
@@ -231,9 +245,11 @@ public class SemanticAnalyzer {
 				search_scope = search_scope.getScopeOf(type.val);
 				if(search_scope == null) {
 					sem_err.println("Semantic Error - (" + name.line + ":" + name.col + "): Identifier '" + type.val + "' has no attributes.");
+					success = false;
 					attr_type.val = "_typeerror_";
 				} else if (!search_scope.search(name.val)) {
 					sem_err.println("Semantic Error - (" + name.line + ":" + name.col + "): Undefined attribute/function '" + name.val + "'.");
+					success = false;
 					attr_type.val = "_typeerror_";
 				} else {
 					search_scope.getType(name.val, attr_type);
@@ -250,40 +266,45 @@ public class SemanticAnalyzer {
 			int int_size = Integer.parseInt(size.val); 
 			if(int_size <= 0) {
 				sem_err.println("Semantic Error - (" + type.line + ":" + type.col + "): Array size must be >= 1.");
+				success = false;
 			} else {
 				++type.dimension;
 				type.array_sizes.add(int_size);
 			}
 		} catch(NumberFormatException e) {
 			sem_err.println("Parsing Error: (" + type.line + ":" + type.col + "): Could not convert String to int: " + size.val + ".");
+			success = false;
 		}
 		return true;
 	}
 	
 	public boolean functionCheck(TypeRef name, SymbolTable var_scope, ArrayList<TypeRef> argsList, TypeRef type) {
 				
-		if(var_scope != null && var_scope.search(name.val, "function")) {
-			ArrayList<Entry> functions = var_scope.getDefinedFunctions(name.val);
-			boolean fmatch = true;
-			for(Entry func : functions) {
-				fmatch = true;
-				ArrayList<Entry> params = func.scope.getAllEntriesOfKind("parameter");
-				if(params.size() != argsList.size()) {
-					continue;
-				} 
-				for(int i = 0; i < params.size(); ++i) {
-					TypeRef paramType = new TypeRef();
-					func.scope.getType(params.get(i).name, paramType);
-					if(!typeMatch(argsList.get(i), paramType)) {
-						fmatch = false;
-						break;
+		while(var_scope != null) {
+			if(var_scope.search(name.val, "function")) {
+				ArrayList<Entry> functions = var_scope.getDefinedFunctions(name.val);
+				boolean fmatch = true;
+				for(Entry func : functions) {
+					fmatch = true;
+					ArrayList<Entry> params = func.scope.getAllEntriesOfKind("parameter");
+					if(params.size() != argsList.size()) {
+						continue;
+					} 
+					for(int i = 0; i < params.size(); ++i) {
+						TypeRef paramType = new TypeRef();
+						func.scope.getType(params.get(i).name, paramType);
+						if(!typeMatch(argsList.get(i), paramType)) {
+							fmatch = false;
+							break;
+						}
+					}
+					if(fmatch) {
+						type.val = func.type;
+						return true;
 					}
 				}
-				if(fmatch) {
-					type.val = func.type;
-					return true;
-				}
 			}
+			var_scope = var_scope.getParentScope();
 		}
 		
 		String argsListStr = "(";
@@ -293,6 +314,7 @@ public class SemanticAnalyzer {
 		argsListStr += ")";
 		
 		sem_err.println("Semantic Error - (" + name.line + ":" + name.col + "): Undefined function: " + name.val + argsListStr + ".");
+		success = false;
 		type.val = "_typeerror_";
 		
 		return true;

@@ -1,0 +1,9 @@
+Semantic Error - (13:4): Array size must be >= 1.
+Semantic Error - (21:13): Multiple declaration: 'int idx' (variable).
+Semantic Error - (34:13): Multiple declaration: 'int idx' (variable).
+Semantic Error - (37:16): Undefined variable: 'maxValue'.
+Semantic Error - (46:19): Type mismatch: cannot convert type 'float' to type 'int'.
+Semantic Error - (46:4): Type mismatch: cannot convert type 'int' to type 'float'.
+Semantic Error - (60:21): Type mismatch: cannot convert type 'float' to type 'int[100]'.
+Semantic Error - (64:4): Dimension out of bounds. Identifier 'var1' has a dimension of 6.
+Semantic Error - (65:4): Dimension out of bounds. Identifier 'var1' has a dimension of 6.

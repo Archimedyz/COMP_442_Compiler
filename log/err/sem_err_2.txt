@@ -1,0 +1,5 @@
+Semantic Error - (10:4): Undefined class: 'A'.
+Semantic Error - (15:16): Function typeMismatch: return type must be 'float'.
+Semantic Error - (24:4): Type mismatch: cannot convert type 'float' to type 'int[2]'.
+Semantic Error - (25:17): Undefined function: mismatchType().
+Semantic Error - (26:4): Type mismatch: cannot convert type 'B[2]' to type 'int[2]'.

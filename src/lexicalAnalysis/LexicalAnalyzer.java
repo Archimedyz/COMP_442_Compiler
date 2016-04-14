@@ -17,6 +17,8 @@ public class LexicalAnalyzer {
 	private DFA token_dfa;
 	private boolean eof;
 	
+	public static boolean success = true;
+	
 	public LexicalAnalyzer() {
 		
 		src_file = null;
@@ -32,6 +34,9 @@ public class LexicalAnalyzer {
 		this.curr_col = 0;
 		this.token_dfa = new DFA();
 		this.eof = true;
+		
+		this.success = true;
+		
 		init();
 	}
 	
@@ -148,6 +153,7 @@ public class LexicalAnalyzer {
 			lex_out.println();
 		} else if(token.equals("_ERROR")) {
 			lex_err.println("ERROR - (" + start_line + ":" + start_col + ") " + err_msg); 
+			success = false;
 		}
 		
 		return lex_token;

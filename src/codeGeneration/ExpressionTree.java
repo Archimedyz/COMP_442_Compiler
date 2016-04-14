@@ -1,18 +1,31 @@
 package codeGeneration;
 
+import java.util.ArrayList;
+
+import semanticAnalysis.TypeRef;
+
 public class ExpressionTree {
 	
 	private Node root;
 	private Node curr;
 	
 	public ExpressionTree() {
-		root = null;
-		curr = null;
+		this.root = null;
+		this.curr = null;
 	}
 	
 	public void pushRoot(String value, NodeType nt) {
 		Node new_root = new Node(value, nt, null);
 		new_root.left = root;
+		new_root.args = null;
+		root = new_root;
+		curr = root;
+	}
+	
+	public void pushRoot(String value, NodeType nt, ArrayList<ExpressionTree> args) {
+		Node new_root = new Node(value, nt, null);
+		new_root.left = root;
+		new_root.args = args;
 		root = new_root;
 		curr = root;
 	}
@@ -93,10 +106,13 @@ public class ExpressionTree {
 		Node left;
 		Node right;
 		
+		ArrayList<ExpressionTree> args;
+		
 		public Node(String value, NodeType node_type, Node parent) {
 			this.value = value;
 			this.node_type = node_type;
 			this.parent = parent;
+			this.args = null;
 		}	
 		
 		public String toString() {
